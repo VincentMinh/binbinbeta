@@ -123,8 +123,7 @@ async def checkin_status(request: Request, token: str, db: Session = Depends(get
     """
     API được máy tính (trang show_qr) gọi để kiểm tra xem điện thoại đã điểm danh thành công chưa.
     """
-    # Sửa lỗi AttributeError: 'and_on' không tồn tại cho joinedload.
-    # Thay vào đó, sử dụng outerjoin và contains_eager để tải có điều kiện.
+    # ... (code query) ...
     log = db.query(AttendanceLog).outerjoin(
         User, and_(AttendanceLog.user_id == User.id, User.is_active == True)
     ).options(contains_eager(AttendanceLog.user)).filter(AttendanceLog.token == token).first()
@@ -137,6 +136,13 @@ async def checkin_status(request: Request, token: str, db: Session = Depends(get
             "name": log.user.name,
             "role": log.user.department.role_code if log.user.department else 'khac'
         }
+        
+        # === SỬA LỖI NGHIÊM TRỌNG ===
+        # Đọc chi nhánh mới nhất (mà điện thoại vừa lưu) từ DB và cập nhật vào session của máy tính
+        if log.user.last_active_branch:
+            request.session["active_branch"] = log.user.last_active_branch
+        # === KẾT THÚC SỬA LỖI ===
+
         request.session.pop("pending_user", None)
         request.session.pop("qr_token", None)
         return JSONResponse(content={"checked_in": True, "redirect_to": str(request.url_for('choose_function'))})
