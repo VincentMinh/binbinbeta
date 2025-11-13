@@ -214,7 +214,7 @@
 
   <script>
     /* ========= Endpoint backend (giữ nguyên) ========= */
-    const byBranchUrl = (b) => `/attendance/api/employees/by-branch/${encodeURIComponent(b)}`;
+    const byBranchUrl = (b) => `/api/employees/by-branch/${encodeURIComponent(b)}`;
     const searchUrl   = (q) => `/attendance/api/employees/search?q=${encodeURIComponent(q)}&loginCode=${encodeURIComponent(loginCode)}`;
     const saveUrl     = () => `/attendance/checkin_bulk`;
 
