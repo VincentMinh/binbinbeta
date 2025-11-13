@@ -24,8 +24,8 @@ APP_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # Tạo đường dẫn tuyệt đối đến thư mục templates
 templates = Jinja2Templates(directory=os.path.join(APP_ROOT, "templates"))
 
-@router.get("/attendance", response_class=HTMLResponse)
-def attendance_ui(request: Request, db: Session = Depends(get_db)): # <-- THÊM Depends(get_db)
+@router.get("/", response_class=HTMLResponse) # <-- SỬA THÀNH "/"
+def attendance_ui(request: Request, db: Session = Depends(get_db)):
     user_data = request.session.get("user") or request.session.get("pending_user")
     if not user_data:
         return RedirectResponse("/login", status_code=303)
