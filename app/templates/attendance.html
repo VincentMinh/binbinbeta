@@ -615,7 +615,7 @@
         if (!navigator.geolocation){ disableForm("Trình duyệt không hỗ trợ GPS."); return resolve(null); }
         navigator.geolocation.getCurrentPosition(async (pos)=>{
           try{
-            const data = await safeFetchJson("/attendance/api/detect-branch", {
+            const data = await safeFetchJson("/api/detect-branch", {
               method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ lat:pos.coords.latitude, lng:pos.coords.longitude })
             });
             if (data && data.error){ disableForm(data.error); return resolve(null); }
@@ -647,7 +647,7 @@
           currentBranch = ch.branch;
           document.getElementById("branchName").textContent = branchDisplay(currentBranch);
           try{
-            await safeFetchJson("/attendance/api/select-branch", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ branch: ch.branch }) });
+            await safeFetchJson("/api/select-branch", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ branch: ch.branch }) });
             closeModal('branchPopup'); await loadEmployeesForBranch();
           }catch(err){ showStatusModal('error', "Lỗi chọn chi nhánh: " + (err?.message || err)); }
         };
