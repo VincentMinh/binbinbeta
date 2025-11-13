@@ -2206,7 +2206,7 @@
                     // 3a. Xây dựng query string với các bộ lọc
                     const params = new URLSearchParams();
                     // Lễ tân chỉ query chi nhánh của mình
-                    params.append('branch', this.user.branch); 
+                    params.append('branch', this.displayBranch);
 
                     // 3b. Lấy giá trị từ các bộ lọc trên màn hình chính
                     const search = document.getElementById('search').value;
