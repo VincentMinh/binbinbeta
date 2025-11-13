@@ -1120,8 +1120,7 @@
                             <div class="mt-1.5 text-sm text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-2">
                                 <span class="font-semibold" x-text="user.name || '...'"></span>
                                 <span>&bull;</span>
-                                <span x-text="user.branch || '...'"></span>
-                                <span>&bull;</span>
+                                <span x-text="displayBranch || '...'"></span> <span>&bull;</span>
                                 <span x-text="formatDate(new Date().toISOString())"></span>
                             </div>
                         </div>
