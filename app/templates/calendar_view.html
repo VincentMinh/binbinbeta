@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+
+{% block title %}Lịch Chấm Công - Bin Bin Hotel{% endblock %}
+{% set active_page = active_page or 'attendance-calendar' %}
+{% block page_title %}Lịch Chấm Công{% endblock %}
+
+{% block content %}
+
+<div class="p-4 sm:p-6 lg:p-8">
+
+<form id="filter-form"
+      class="flex flex-wrap gap-6 mb-6 bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-lg border border-gray-100 dark:border-slate-800">
+  {% if user.role in ['admin', 'boss', 'quanly'] %}
+  <div class="flex-1 min-w-[150px]">
+    <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-300">Chi nhánh</label>
+    <select id="branch-select" name="chi_nhanh"
+            onchange="this.form.submit()"
+            class="w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+      {% for branch in branches %}
+        {% if branch.lower() not in ['admin', 'boss'] %}
+        <option value="{{ branch }}" {% if branch == selected_branch %}selected{% endif %}>
+          {{ branch }}
+        </option>
+        {% endif %}
+      {% endfor %}
+    </select>
+  </div>
+  
+ 
+
+  {% endif %}
+
+  <div class="flex-1 min-w-[120px]">
+    <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-300">Tháng</label>
+    <select id="month-select" name="month"
+            onchange="this.form.submit()"
+            class="w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+      {% for i in range(1, 13) %}
+      <option value="{{ i }}" {% if i == selected_month %}selected{% endif %}>Tháng {{ i }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="flex-1 min-w-[120px]">
+    <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-300">Năm</label>
+    <select id="year-select" name="year"
+            onchange="this.form.submit()"
+            class="w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+      {% set current_year = selected_year %}
+      {% for i in range(current_year - 5, current_year + 3) %}
+      <option value="{{ i }}" {% if i == selected_year %}selected{% endif %}>Năm {{ i }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="flex-1 min-w-[150px] flex items-end">
+    <button id="export-excel-btn" type="button"
+            class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-cyan-600 hover:to-teal-600 text-white px-4 py-2.5 rounded-lg shadow-md flex items-center justify-center gap-2 font-semibold transition text-sm">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" /><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" /></svg>
+      <span>Xuất Excel</span>
+    </button>
+  </div>
+</form>
+
+<div id="calendar-table-container" class="bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-gray-100 dark:border-slate-800 overflow-x-auto">
+  <table id="calendar-table" class="w-full table-fixed text-xs border-collapse border border-gray-200 dark:border-slate-700">
+    <thead class="bg-gray-100 dark:bg-slate-800 sticky top-0 z-20 border-b border-gray-200 dark:border-slate-700">
+      <tr>
+        <th class="sticky left-0 bg-gray-100 dark:bg-slate-800 px-6 py-3 text-left font-semibold text-gray-700 dark:text-gray-300 z-30 border-r border-gray-200 dark:border-slate-700">
+          <div id="employee-header-col">Nhân viên</div>
+        </th>
+        {% for day in range(1, num_days + 1) %}
+        <th class="calendar-header-cell px-0.5 py-2 text-center font-medium text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-slate-700
+                   {% if day % 2 == 0 %}bg-gray-50 dark:bg-slate-800/50{% else %}bg-white dark:bg-slate-900{% endif %}
+                   {% if day == current_day %}bg-indigo-50 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300{% endif %}">
+          {{ day }}
+        </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody class="text-gray-800 dark:text-gray-300">
+      {% for code, emp in employee_data.items() %}
+      <tr class="employee-row border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition">
+        <td id="employee-cell-{{ code }}" class="sticky left-0 bg-white dark:bg-slate-900 px-4 py-3 break-words z-10 border-r border-gray-200 dark:border-slate-700 group-hover:bg-gray-50 dark:group-hover:bg-slate-800/50">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="font-medium text-gray-800 dark:text-gray-200">
+                {{ emp.name }}
+                {% if emp.worked_away_from_main_branch %}
+                  <span class="text-red-500 font-bold" title="Nhân viên có làm việc khác chi nhánh chính trong tháng">*</span>
+                {% endif %}
+              </div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">{{ emp.role }}</div>
+            </div>
+            {% if emp.dashboard_stats %}
+            <button onclick="toggleDashboard('{{ code }}')" class="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors" title="Xem thống kê">
+                <svg id="arrow-{{ code }}" class="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+            </button>
+            {% endif %}
+          </div>
+        </td>
+        {% for day in range(1, num_days + 1) %}
+          {% set day_data = emp.daily_work.get(day) %}
+          {% set cell_class = '' %}
+          {% set cell_content = '' %}
+          {% set services = day_data.services if day_data else [] %}
+
+          {% if day_data and day_data.work_units > 0 %}
+            {% set work_units = day_data.work_units %}
+            {% set is_overtime_flag = day_data.is_overtime %}
+            {% set overtime_branch = day_data.work_branch if day_data else '' %}
+
+            {# Logic xác định màu nền #}
+            {% if work_units > 1.0 or is_overtime_flag %}
+              {% set cell_class = 'bg-yellow-50 dark:bg-yellow-900/30' %}
+            {% elif work_units == 1.0 %}
+              {% set cell_class = 'bg-green-50 dark:bg-green-900/30' %}
+            {% else %}
+              {% set cell_class = 'bg-blue-50 dark:bg-blue-900/30' %}
+            {% endif %}
+
+            {# Logic xác định nội dung ô #}
+            {% set formatted_work_units = work_units|int if work_units % 1 == 0 else work_units %}
+            {% set cell_content = formatted_work_units %}
+            {# Chỉ hiển thị chi nhánh làm thêm cho LTTC/BPTC khi ở bộ lọc của họ. Các trường hợp tăng ca khác chỉ được tô màu. #}
+            {% if is_overtime_flag and overtime_branch and emp.role_key in ['lttc', 'bptc'] and selected_branch in ['LTTC', 'BPTC'] %}
+              {% set cell_content = '{}<br><span class="text-red-500 text-xs font-semibold">{}</span>'.format(formatted_work_units, overtime_branch) %}
+            {% endif %}
+          {% endif %}
+          <td class="calendar-day-cell px-0.5 py-2 text-center align-top {{ cell_class }} border-r border-gray-200 dark:border-slate-700 transition-all duration-300 break-words">
+            <div class="text-sm text-gray-700 dark:text-gray-300" title="{{ services | join(', ') }}">{{ cell_content | safe }}</div>
+            {% if services %}
+            <div class="text-xs text-indigo-700 dark:text-indigo-300 mt-1">{{ services | join(', ') | safe }}</div>
+            {% endif %}
+          </td>
+        {% endfor %}
+      </tr>
+      {% if emp.dashboard_stats %}
+      <tr id="dashboard-{{ code }}" class="hidden bg-gray-50 dark:bg-slate-800 border-b-2 border-gray-300 dark:border-slate-600">
+        <td colspan="{{ num_days + 1 }}" class="bg-gray-50 dark:bg-slate-800 p-4">
+            <div class="flex justify-center">
+            <div class="flex flex-wrap justify-center gap-4">
+                <div class="bg-blue-100 dark:bg-blue-900/50 p-3 rounded-lg shadow-sm flex-shrink-0 w-32 text-center">
+                    <p class="text-xs text-blue-700 dark:text-blue-300 font-semibold">Số ngày làm</p>
+                    <p class="text-2xl font-bold text-blue-800 dark:text-blue-200">{{ emp.dashboard_stats.so_ngay_lam }}</p>
+                </div>
+                <div class="bg-red-100 dark:bg-red-900/50 p-3 rounded-lg shadow-sm flex-shrink-0 w-32 text-center">
+                    <p class="text-xs text-red-700 dark:text-red-300 font-semibold">Số ngày nghỉ</p>
+                    <p class="text-2xl font-bold text-red-800 dark:text-red-200">{{ emp.dashboard_stats.so_ngay_nghi }}</p>
+                </div>
+                
+                {% set so_ngay_tang_ca = emp.dashboard_stats.so_ngay_tang_ca %}
+                {% if so_ngay_tang_ca > 0 %}
+                <div class="p-3 rounded-lg shadow-sm transition-colors bg-yellow-100 dark:bg-yellow-900/50 cursor-pointer hover:bg-yellow-200 dark:hover:bg-yellow-900 flex-shrink-0 w-32 text-center"
+                     onclick="showDetails('{{ code }}', 'overtime', '{{ emp.name }}')">
+                    <p class="text-xs font-semibold text-yellow-700 dark:text-yellow-300">Số ngày tăng ca</p>
+                    <p class="text-2xl font-bold text-yellow-800 dark:text-yellow-200">{{ so_ngay_tang_ca }}</p>
+                </div>
+                {% endif %}
+
+                <div class="bg-green-100 dark:bg-green-900/50 p-3 rounded-lg shadow-sm flex-shrink-0 w-32 text-center">
+                    <p class="text-xs text-green-700 dark:text-green-300 font-semibold">Tổng số công</p>
+                    <p class="text-2xl font-bold text-green-800 dark:text-green-200">{{ "%.1f"|format(emp.dashboard_stats.tong_so_cong) }}</p>
+                </div>
+
+                {% if emp.role_key == 'buongphong' or emp.role_key == 'bptc' %}
+                    {% set tong_giat = emp.dashboard_stats.tong_dich_vu_giat %}
+                    {% if tong_giat > 0 %}
+                    <div class="p-3 rounded-lg shadow-sm transition-colors bg-purple-100 dark:bg-purple-900/50 cursor-pointer hover:bg-purple-200 dark:hover:bg-purple-900 flex-shrink-0 w-32 text-center"
+                         onclick="showDetails('{{ code }}', 'laundry', '{{ emp.name }}')">
+                        <p class="text-xs font-semibold text-purple-700 dark:text-purple-300">Đồ giặt</p>
+                        <p class="text-2xl font-bold text-purple-800 dark:text-purple-200">{{ tong_giat }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% set tong_ui = emp.dashboard_stats.tong_dich_vu_ui %}
+                    {% if tong_ui > 0 %}
+                    <div class="p-3 rounded-lg shadow-sm transition-colors bg-fuchsia-100 dark:bg-fuchsia-900/50 cursor-pointer hover:bg-fuchsia-200 dark:hover:bg-fuchsia-900 flex-shrink-0 w-32 text-center"
+                         onclick="showDetails('{{ code }}', 'ironing', '{{ emp.name }}')">
+                        <p class="text-xs font-semibold text-fuchsia-700 dark:text-fuchsia-300">Đồ ủi</p>
+                        <p class="text-2xl font-bold text-fuchsia-800 dark:text-fuchsia-200">{{ tong_ui }}</p>
+                    </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+            </div>
+        </td>
+      </tr>
+      {% endif %}
+      {% else %}
+      <tr>
+        <td colspan="{{ num_days + 1 }}" class="text-center py-10 text-gray-500 dark:text-gray-400">
+          Không có dữ liệu chấm công.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm dark:text-gray-200">
+  <div class="flex items-center justify-center gap-2 bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border dark:border-slate-700">
+    <span class="w-4 h-4 rounded bg-green-50 dark:bg-green-900/30 border border-gray-300 dark:border-slate-600"></span> Đủ công
+  </div>
+  <div class="flex items-center justify-center gap-2 bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border dark:border-slate-700">
+    <span class="w-4 h-4 rounded bg-yellow-50 dark:bg-yellow-900/30 border border-gray-300 dark:border-slate-600"></span> Tăng ca
+  </div>
+  <div class="flex items-center justify-center gap-2 bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border dark:border-slate-700">
+    <span class="w-4 h-4 rounded bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600"></span> Nghỉ / Không dữ liệu
+  </div>
+</div>
+
+</div>
+
+<div id="detailModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 z-50 flex items-center justify-center p-4 transition-opacity duration-300 opacity-0">
+<div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col transform transition-all duration-300 scale-95 opacity-0" id="modal-panel">
+    <div class="flex justify-between items-center p-4 border-b dark:border-slate-700">
+        <h3 id="modalTitle" class="text-lg font-semibold text-gray-800 dark:text-white">Chi tiết</h3>
+        <button onclick="closeDetailModal()" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors">
+            <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+    </div>
+    <div class="p-4 overflow-y-auto">
+        <table class="min-w-full text-sm dark:text-gray-300">
+            <thead id="modalThead" class="bg-gray-50 dark:bg-slate-700">
+                </thead>
+            <tbody id="modalTbody" class="divide-y divide-gray-200 dark:divide-slate-700">
+                </tbody>
+        </table>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+  function toggleDashboard(code) {
+    const dashboardRow = document.getElementById(`dashboard-${code}`);
+    const arrowIcon = document.getElementById(`arrow-${code}`);
+    if (dashboardRow) {
+      const isHidden = dashboardRow.classList.contains('hidden');
+      if (isHidden) {
+        dashboardRow.classList.remove('hidden');
+        arrowIcon.classList.add('rotate-180');
+      } else {
+        dashboardRow.classList.add('hidden');
+        arrowIcon.classList.remove('rotate-180');
+      }
+    }
+  }
+</script>
+
+<script id="employee-details-data" type="application/json">
+  {{ employee_data_for_js | tojson | safe }}
+</script>
+
+<script>
+  let allEmployeeDetails = {};
+
+  document.addEventListener('DOMContentLoaded', () => {
+      const dataEl = document.getElementById('employee-details-data');
+      if (dataEl) {
+          try {
+              allEmployeeDetails = JSON.parse(dataEl.textContent);
+          } catch (e) {
+              console.error("Lỗi parse dữ liệu chi tiết nhân viên:", e);
+          }
+      }
+  });
+
+  function showDetails(employeeCode, dataType, employeeName) {
+      const employee = allEmployeeDetails[employeeCode];
+      if (!employee || !employee.dashboard_stats) return;
+
+      const modal = document.getElementById('detailModal');
+      const modalPanel = document.getElementById('modal-panel');
+      const titleEl = document.getElementById('modalTitle');
+      const theadEl = document.getElementById('modalThead');
+      const tbodyEl = document.getElementById('modalTbody');
+
+      tbodyEl.innerHTML = ''; // Xóa nội dung cũ
+      let records = [];
+      let headers = [];
+      let title = '';
+      let rowsHtml = '';
+      const rowClass = "hover:bg-gray-50 dark:hover:bg-slate-700/50";
+      const cellClass = "px-4 py-2";
+
+      if (dataType === 'overtime') {
+          title = `Chi tiết Tăng ca - ${employeeName}`;
+          headers = ['Ngày', 'Giờ', 'Chi nhánh làm', 'Số công'];
+          records = employee.dashboard_stats.overtime_details || [];
+          rowsHtml = records.map(r => `<tr class="${rowClass}"><td class="${cellClass}">${r.date}</td><td class="${cellClass}">${r.time}</td><td class="${cellClass}">${r.branch || ''}</td><td class="${cellClass}">${r.work_units}</td></tr>`).join('');
+      } else if (dataType === 'laundry') {
+          title = `Chi tiết Đồ giặt - ${employeeName}`;
+          headers = ['Ngày', 'Giờ', 'Chi nhánh làm', 'Số phòng', 'Số lượng'];
+          records = employee.dashboard_stats.laundry_details || [];
+          rowsHtml = records.map(r => `<tr class="${rowClass}"><td class="${cellClass}">${r.date}</td><td class="${cellClass}">${r.time}</td><td class="${cellClass}">${r.branch || ''}</td><td class="${cellClass}">${r.room || ''}</td><td class="${cellClass}">${r.quantity || ''}</td></tr>`).join('');
+      } else if (dataType === 'ironing') {
+          title = `Chi tiết Đồ ủi - ${employeeName}`;
+          headers = ['Ngày', 'Giờ', 'Chi nhánh làm', 'Số phòng', 'Số lượng'];
+          records = employee.dashboard_stats.ironing_details || [];
+          rowsHtml = records.map(r => `<tr class="${rowClass}"><td class="${cellClass}">${r.date}</td><td class="${cellClass}">${r.time}</td><td class="${cellClass}">${r.branch || ''}</td><td class="${cellClass}">${r.room || ''}</td><td class="${cellClass}">${r.quantity || ''}</td></tr>`).join('');
+      }
+
+      titleEl.textContent = title;
+      theadEl.innerHTML = `<tr>${headers.map(h => `<th class="px-4 py-2 text-left font-semibold text-gray-600 dark:text-gray-300">${h}</th>`).join('')}</tr>`;
+      
+      if (records.length === 0) {
+          tbodyEl.innerHTML = `<tr><td colspan="${headers.length}" class="text-center py-4 text-gray-500 dark:text-gray-400">Không có dữ liệu chi tiết.</td></tr>`;
+      } else {
+          tbodyEl.innerHTML = rowsHtml;
+      }
+
+      modal.classList.remove('hidden');
+      // Kích hoạt hiệu ứng chuyển động
+      setTimeout(() => {
+          modal.classList.remove('opacity-0');
+          modalPanel.classList.remove('scale-95', 'opacity-0');
+      }, 10);
+  }
+
+  function closeDetailModal() {
+      const modal = document.getElementById('detailModal');
+      const modalPanel = document.getElementById('modal-panel');
+      modal.classList.add('opacity-0');
+      modalPanel.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => {
+          modal.classList.add('hidden');
+      }, 300); // Phải khớp với thời gian transition
+  }
+
+  // --- Logic cho cột nhân viên ở chế độ xem toàn bộ ---
+  document.addEventListener('DOMContentLoaded', () => {
+      const employeeHeaderCol = document.getElementById('employee-header-col');
+      if (employeeHeaderCol) {
+          // Đặt độ rộng cố định cho cột đầu tiên để giữ layout ổn định khi cuộn
+          employeeHeaderCol.parentElement.style.width = '150px';
+      }
+  });
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const exportBtn = document.getElementById('export-excel-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', function() {
+            // Lấy giá trị tháng và năm hiện tại từ bộ lọc
+            const month = document.getElementById('month-select').value;
+            const year = document.getElementById('year-select').value;
+
+            // Lưu ý: Chúng ta không gửi 'chi_nhanh' vì yêu cầu là xuất TẤT CẢ nhân viên
+            
+            // Xây dựng URL
+            const params = new URLSearchParams();
+            params.append('month', month);
+            params.append('year', year);
+
+            const exportUrl = `/attendance/calendar-export-excel?${params.toString()}`;
+
+            // Thông báo cho người dùng
+            const originalContent = this.innerHTML;
+            this.innerHTML = `
+                <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Đang xử lý...</span>
+            `;
+            this.disabled = true; // Vô hiệu hóa nút
+
+            // Sử dụng fetch để kiểm tra lỗi trước khi chuyển hướng
+            fetch(exportUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.detail || 'Lỗi không xác định từ server.'); });
+                    }
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `ChamCong_Thang_${month}_${year}.xlsx`; // Tên file mặc định
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename\*=UTF-8''(.+)/);
+                        if (filenameMatch && filenameMatch.length > 1) {
+                            filename = decodeURIComponent(filenameMatch[1]);
+                        }
+                    }
+                    return response.blob().then(blob => ({ blob, filename }));
+                })
+                .then(({ blob, filename }) => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                })
+                .catch(error => {
+                    alert('Lỗi mạng, không thể xuất file. ' + error);
+                })
+                .finally(() => {
+                    // Trả lại trạng thái nút
+                    this.innerHTML = originalContent;
+                    this.disabled = false;
+                });
+        });
+    }
+});
+</script>
+{% endblock %}

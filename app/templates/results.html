@@ -1,0 +1,1752 @@
+{% extends "base.html" %}
+
+{% block title %}Lịch sử Điểm Danh - Bin Bin Hotel{% endblock %}
+{% set active_page = active_page or 'attendance-results' %}
+{% block page_title %}Lịch sử Điểm Danh{% endblock %}
+
+{% block content %}
+<style>
+    .table-auto th, .table-auto td {
+        border: 1px solid #e2e8f0;
+        padding: 8px 12px;
+    }
+    .table-auto th {
+        background-color: #f7fafc;
+    }
+    .pagination-btn.current {
+        background-color: #3b82f6;
+        color: white;
+    }
+    /* For sticky header */
+    #results-table {
+        max-height: 70vh; /* Adjust height as needed */
+        overflow-y: auto;
+        position: relative;
+    }
+    #results-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        /* Thêm nền cho header khi cuộn (từ base.html dark mode) */
+        background-color: theme('colors.gray.50'); 
+    }
+    .dark #results-table thead th {
+        background-color: theme('colors.slate.800');
+    }
+
+    .sortable {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+    }
+    .sortable .sort-indicator {
+        position: absolute;
+        top: 50%;
+        right: 8px;
+        transform: translateY(-50%);
+        opacity: 0.5;
+        font-size: 0.8em;
+        color: #6b7280;
+        line-height: 1;
+    }
+    .sortable.asc .sort-indicator, .sortable.desc .sort-indicator {
+        opacity: 1;
+        color: #2563eb;
+    }
+    .sortable:hover .sort-indicator {
+        opacity: 0.8;
+    }
+    /* Modal animation (đã có trong base.html, nhưng giữ lại để an toàn) */
+    #record-modal { transition: opacity 0.2s ease-in-out; }
+    #record-modal > div { transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out; }
+    #record-modal.hidden > div { transform: translateY(1rem) scale(0.98); opacity: 0; }
+    .focus-ring:focus { outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25); }
+    .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+<style>
+    /* Skeleton loading animation */
+    .skeleton-card { animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+</style>
+
+<div class="p-4 sm:p-6 lg:p-8">
+        <!-- ================================================================== -->
+        <!-- ======================= DASHBOARD SECTION ======================== -->
+        <!-- ================================================================== --> 
+        <div id="dashboard-section" class="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"> 
+            <!-- Card Tổng công -->
+            <div class="relative overflow-hidden rounded-2xl bg-green-50 dark:bg-green-900/30 p-5 shadow-sm border border-green-200 dark:border-green-800 transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                <svg class="absolute -right-4 -bottom-4 h-20 w-20 text-green-500/10 dark:text-green-400/10" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div>
+                    <p class="text-sm font-medium text-green-600 dark:text-green-300">Tổng số công</p>
+                    <p id="stat-total-work-units" class="mt-1 text-3xl font-bold text-green-800 dark:text-green-200" data-countup="0">0</p>
+                </div>
+            </div>
+             <!-- Card Tổng số ngày vắng -->
+            <div class="relative overflow-hidden rounded-2xl bg-red-50 dark:bg-red-900/30 p-5 shadow-sm border border-red-200 dark:border-red-800 transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                <svg class="absolute -right-4 -bottom-4 h-20 w-20 text-red-500/10 dark:text-red-400/10" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                <div>
+                    <p class="text-sm font-medium text-red-600 dark:text-red-300">Tổng số ngày vắng</p>
+                    <p id="stat-total-absences" class="mt-1 text-3xl font-bold text-red-800 dark:text-red-200" data-countup="0">0</p>
+                </div>
+            </div>
+            <!-- Card Tăng ca -->
+            <div class="relative overflow-hidden rounded-2xl bg-amber-50 dark:bg-amber-900/30 p-5 shadow-sm border border-amber-200 dark:border-amber-800 transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                <svg class="absolute -right-4 -bottom-4 h-20 w-20 text-amber-500/10 dark:text-amber-400/10" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                <div>
+                    <p class="text-sm font-medium text-amber-600 dark:text-amber-300">Lượt tăng ca</p>
+                    <p id="stat-total-overtime" class="mt-1 text-3xl font-bold text-amber-800 dark:text-amber-200" data-countup="0">0</p>
+                </div>
+            </div>
+            <!-- Card Dịch vụ -->
+            <div class="relative overflow-hidden rounded-2xl bg-cyan-50 dark:bg-cyan-900/30 p-5 shadow-sm border border-cyan-200 dark:border-cyan-800 transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                <svg class="absolute -right-4 -bottom-4 h-20 w-20 text-cyan-500/10 dark:text-cyan-400/10" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1014.625 7.5H12v-2.625z" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5h-1.5a1.5 1.5 0 01-1.5-1.5V5.25a1.5 1.5 0 011.5-1.5h1.5v3.75z" /></svg>
+                <div>
+                    <p class="text-sm font-medium text-cyan-600 dark:text-cyan-300">Tổng dịch vụ</p>
+                    <p id="stat-total-services" class="mt-1 text-3xl font-bold text-cyan-800 dark:text-cyan-200" data-countup="0">0</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="filter-container" class="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm mb-6">
+            <div class="p-4">
+                <div id="search-filters" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 {% if user.role in ['admin', 'boss'] %}lg:grid-cols-5{% else %}lg:grid-cols-4{% endif %} gap-4">
+                        <!-- Hàng 1: Loại, Ngày, CN Làm, Số công, Chức vụ -->
+                        {% if user.role not in ['quanly', 'ktv'] %}
+                        <div>
+                            <label for="filter-type" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Loại bản ghi</label>
+                            <select id="filter-type" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                                <option value="all" selected>Tất cả</option>
+                                <option value="Điểm danh">Điểm danh</option>
+                                <option value="Dịch vụ">Chấm Dịch Vụ</option>
+                            </select>
+                        </div>
+                        {% endif %}
+                        <div>
+                            <label for="filter-date" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Ngày chấm công</label>
+                            <input type="text" id="filter-date" placeholder="dd/mm/yyyy" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        </div>
+                        {% if user.role not in ['quanly', 'ktv'] %}
+                        <div>
+                            <label for="filter-cn-lam" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">CN Làm</label>
+                            <select id="filter-cn-lam" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                                <option value="">Tất cả</option>
+                                {% for branch in branches %}
+                                {% if branch not in ['Admin', 'Boss'] %}
+                                <option value="{{ branch }}">{{ branch }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="container-filter-so-cong">
+                            <label for="filter-so-cong" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Số công</label>
+                            <select id="filter-so-cong" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition min-w-[120px]">
+                                </select>
+                        </div>
+                        {% endif %}
+                        {% if user.role in ['admin', 'boss'] %}
+                        <div class="relative">
+                            <label for="filter-nguoi-thuc-hien" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Người chấm công</label>
+                            <input type="text" id="filter-nguoi-thuc-hien" placeholder="Tìm theo mã hoặc tên..." autocomplete="off" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            <div id="performer-filter-results" class="hidden absolute z-10 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md mt-1 max-h-40 overflow-y-auto"></div>
+                        </div>
+                        {% endif %}
+                        {% if user.role not in ['quanly', 'ktv'] %}
+                        <div id="container-filter-chuc-vu" class="w-full">
+                            <label for="filter-chuc-vu" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Chức vụ</label>
+                            <select id="filter-chuc-vu" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                                <option value="">Tất cả</option>
+                                {% if user.role in ['admin', 'boss'] %}
+                                    {% for role_key, role_name in roles.items() if role_key not in ['admin', 'boss'] %}
+                                    <option value="{{ role_name }}">{{ role_name }}</option>
+                                    {% endfor %}
+                                {% elif user.role == 'letan' %}
+                                    {% for role_key, role_name in roles.items() if role_key in ['letan', 'buongphong', 'baove'] %}
+                                    <option value="{{ role_name }}">{{ role_name }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    {% for role_key, role_name in roles.items() %}
+                                    <option value="{{ role_name }}">{{ role_name }}</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div id="container-filter-tang-ca">
+                            <label for="filter-tang-ca" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Tăng ca</label>
+                            <select id="filter-tang-ca" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                                <option value="all">Tất cả</option>
+                                <option value="yes">Có</option>
+                                <option value="no">Không</option>
+                            </select>
+                        </div>
+                        <div id="container-filter-dich-vu" style="display: none;">
+                            <label for="filter-dich-vu" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Dịch vụ</label>
+                            <select id="filter-dich-vu" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                                <option value="">Tất cả</option>
+                                <option value="Giặt">Giặt</option>
+                                <option value="Ủi">Ủi</option>
+                            </select>
+                        </div>
+                        <div id="container-filter-so-phong" style="display: none;">
+                            <label for="filter-so-phong" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Số phòng</label>
+                            <input type="text" id="filter-so-phong" placeholder="Tìm theo số phòng..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        </div>
+                        <div class="relative">
+                            <label for="filter-nhan-vien" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Nhân viên</label>
+                            <input type="text" id="filter-nhan-vien" placeholder="Tìm theo mã hoặc tên..." autocomplete="off" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            <div id="employee-filter-results" class="hidden absolute z-10 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md mt-1 max-h-40 overflow-y-auto"></div>
+                        </div>
+                        {% endif %} {# End if not quanly/ktv #}
+                        <div class="{% if user.role in ['admin', 'boss'] %}lg:col-span-2{% endif %}">
+                            <label for="filter-ghi-chu" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Tìm trong ghi chú</label>
+                            <input type="text" id="filter-ghi-chu" placeholder="Tìm trong ghi chú..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-wrap justify-between items-center gap-4 pt-2">
+                        <div class="flex items-center gap-3">
+                            <button id="apply-filters" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-md flex items-center gap-2 font-semibold transition text-sm">Áp dụng</button>
+                            <button id="clear-filters" class="bg-slate-200 hover:bg-slate-300 dark:bg-slate-600 dark:hover:bg-slate-500 text-slate-800 dark:text-slate-100 px-5 py-2 rounded-lg flex items-center gap-2 font-medium transition text-sm">Xóa bộ lọc</button>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            {% if user.role in ['admin', 'boss'] %}
+                            <button id="export-attendance-btn" class="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-cyan-600 hover:to-teal-600 text-white px-5 py-2 rounded-lg shadow-md flex items-center gap-2 font-semibold transition text-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" /><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" /></svg>
+                                Xuất Excel
+                            </button>
+                            <button id="open-absence-modal-btn" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-orange-500 hover:to-amber-500 text-white px-5 py-2 rounded-lg shadow-md flex items-center gap-2 font-semibold transition text-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" /><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" /></svg>
+                                Cập nhật vắng
+                            </button>
+                            <button id="add-record-btn" class="bg-gradient-to-r from-green-500 to-blue-500 hover:from-blue-600 hover:to-green-600 text-white px-5 py-2 rounded-lg shadow-md flex items-center gap-2 font-semibold transition text-sm">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                                <span>Thêm mới</span>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-4 flex flex-col sm:flex-row justify-between items-center gap-4 transition-all duration-300">
+            <div class="flex items-center gap-4">
+                {% if user.role in ['admin', 'boss'] %}
+                <button id="delete-selected-btn" class="hidden px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition font-semibold text-sm flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                    Xóa mục đã chọn
+                </button>
+                {% endif %}
+                <div class="flex items-center gap-2">
+                    <label for="per-page-select" class="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Hiển thị:</label>
+                    <select id="per-page-select" class="block rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 pl-3 pr-8 text-sm">
+                        <option value="100">100</option>
+                        <option value="500">500</option>
+                        <option value="1000">1000</option>
+                    </select>
+                </div>
+                <p id="record-count" class="text-sm text-gray-500 dark:text-gray-400 font-medium"></p>
+            </div>
+            <div id="pagination-container" class="w-full sm:w-auto flex justify-center items-center mt-4 sm:mt-0">
+                <div id="pagination-controls" class="flex justify-center items-center gap-1"></div>
+            </div>
+        </div>
+
+        <div id="loading" class="text-center py-10 hidden">
+            <p class="text-gray-500 dark:text-gray-400">Đang tải dữ liệu, vui lòng chờ...</p>
+        </div>
+
+        <!-- Skeleton Loading UI -->
+        <div id="skeleton-container" class="w-full bg-white dark:bg-slate-900/70 overflow-hidden rounded-2xl shadow-md border border-slate-200 dark:border-slate-800 transition-all duration-300 mb-6">
+            <div class="overflow-auto max-h-[65vh]">
+                <table class="w-full text-sm">
+                    <thead class="text-xs text-slate-700 uppercase dark:text-slate-400 bg-slate-100 dark:bg-slate-800">
+                        <tr><th class="px-4 py-5"><div class="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4"></div></th><th class="px-4 py-5"><div class="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/2"></div></th><th class="px-4 py-5"><div class="h-4 bg-slate-200 dark:bg-slate-700 rounded w-full"></div></th><th class="px-4 py-5"><div class="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/3"></div></th><th class="px-4 py-5"><div class="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/2"></div></th><th class="px-4 py-5"><div class="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4"></div></th></tr>
+                    </thead>
+                    <tbody id="skeleton-rows">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="error" class="hidden text-center py-10 bg-red-100 text-red-700 rounded-md">
+            <p>Có lỗi xảy ra khi tải dữ liệu. Vui lòng thử lại.</p>
+        </div>
+
+        <div id="results-table-container" class="hidden w-full bg-white dark:bg-slate-900/70 overflow-hidden rounded-2xl shadow-md border border-slate-200 dark:border-slate-800 transition-all duration-300 mb-6">
+            <div id="results-table-scroll" class="overflow-auto max-h-[65vh]">
+                <table class="w-full text-sm text-left text-slate-500 dark:text-slate-400 border-collapse">
+                    <thead id="results-thead" class="sticky top-0 z-10 text-xs text-slate-700 uppercase dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                        </thead>
+                    <tbody id="results-tbody">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+</div>
+
+<div id="record-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div class="relative w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col animate-fadeIn">
+        <div class="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+            <div class="flex items-center gap-3">
+                <div class="grid place-items-center w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50">
+                    <svg class="w-5 h-5 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                </div>
+                <h3 id="modal-title" class="text-lg font-semibold text-slate-800 dark:text-white">Thêm bản ghi mới</h3>
+            </div>
+            <button id="modal-close-btn" class="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+        <form id="record-form" class="p-5 space-y-5 overflow-y-auto">
+            <input type="hidden" id="modal-record-id" name="record_id">
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div id="modal-type-selector-container">
+                    <label for="modal-record-type" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Loại bản ghi <span class="text-rose-500">*</span></label>
+                    <select id="modal-record-type" name="record_type" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <option value="attendance">Điểm danh</option>
+                        <option value="service">Dịch vụ</option>
+                    </select>
+                </div>
+                <div id="modal-performer-container" class="relative">
+                    <label for="modal-nguoi-thuc-hien-search" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Người thực hiện <span class="text-rose-500">*</span></label>
+                    <input type="text" id="modal-nguoi-thuc-hien-search" placeholder="Tìm theo mã hoặc tên..." autocomplete="off" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    <input type="hidden" id="modal-nguoi-thuc-hien-code" name="nguoi_thuc_hien">
+                    <div id="performer-search-results" class="hidden absolute z-20 mt-1 w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-lg max-h-48 overflow-y-auto"></div>
+                </div>
+                <div class="relative">
+                    <label for="modal-ma-nv-search" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Nhân viên <span class="text-rose-500">*</span></label>
+                    <input type="text" id="modal-ma-nv-search" placeholder="Tìm theo mã hoặc tên..." autocomplete="off" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    <input type="hidden" id="modal-ma-nv" name="ma_nv">
+                    <div id="employee-search-results" class="hidden absolute z-20 mt-1 w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-lg max-h-48 overflow-y-auto"></div>
+                </div>
+                <div>
+                    <label for="modal-thoi-gian" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Thời gian <span class="text-rose-500">*</span></label>
+                    <input type="text" id="modal-thoi-gian" name="thoi_gian" required placeholder="dd/mm/yyyy HH:MM" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                </div>
+                <div id="modal-cn-lam-container">
+                    <label for="modal-chi-nhanh-lam" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Chi nhánh làm <span class="text-rose-500">*</span></label>
+                    <select id="modal-chi-nhanh-lam" name="chi_nhanh_lam" required class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <option value="" disabled selected>Chọn chi nhánh</option>
+                        {% for branch in branches %}
+                        {% if branch not in ['Admin', 'Boss'] %}
+                        <option value="{{ branch }}">{{ branch }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div id="modal-tang-ca-container" class="flex items-end pb-2">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="modal-la-tang-ca" name="la_tang_ca" class="h-4 w-4 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                        <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Tăng ca</span>
+                    </label>
+                </div>
+            </div>
+
+            <fieldset id="modal-attendance-fields" class="border-t border-slate-200 dark:border-slate-700 pt-4">
+                <legend class="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Thông tin điểm danh</legend>
+                <div>
+                    <label for="modal-so-cong-nv" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Số công <span class="text-rose-500">*</span></label>
+                    <input type="number" step="0.5" min="0.5" id="modal-so-cong-nv" name="so_cong_nv" value="1" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                </div>
+            </fieldset>
+
+            <fieldset id="modal-service-fields" class="hidden border-t border-slate-200 dark:border-slate-700 pt-4">
+                <legend class="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Thông tin dịch vụ</legend>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label for="modal-dich-vu" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Dịch vụ <span class="text-rose-500">*</span></label>
+                        <select id="modal-dich-vu" name="dich_vu" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            <option value="" disabled selected>Chọn dịch vụ</option>
+                            <option value="Giặt">Giặt</option>
+                            <option value="Ủi">Ủi</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="modal-so-phong" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Số phòng <span class="text-rose-500">*</span></label>
+                        <input type="text" id="modal-so-phong" name="so_phong" placeholder="VD: 201, 202" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    </div>
+                    <div>
+                        <label for="modal-so-luong" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Số lượng <span class="text-rose-500">*</span></label>
+                        <input type="text" id="modal-so-luong" name="so_luong" placeholder="VD: 2" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    </div>
+                </div>
+            </fieldset>
+
+            <div>
+                <label for="modal-ghi-chu" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Ghi chú</label>
+                <textarea id="modal-ghi-chu" name="ghi_chu" rows="2" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></textarea>
+            </div>
+        </form>
+        <div class="p-5 border-t border-slate-200 dark:border-slate-700 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+            <button type="button" id="modal-cancel-btn" class="px-5 py-2.5 text-center text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">Hủy</button>
+            <button type="submit" id="modal-submit-btn" form="record-form" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-lg shadow-blue-500/20">Lưu lại</button>
+        </div>
+    </div>
+</div>
+
+{% if user.role in ['admin', 'boss'] %}
+<div id="absence-check-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div class="relative w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col animate-fadeIn">
+        <div class="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+            <div class="flex items-center gap-3">
+                <div class="grid place-items-center w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/50">
+                    <svg class="w-5 h-5 text-amber-600 dark:text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" /></svg>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-800 dark:text-white">Cập nhật điểm danh vắng</h3>
+            </div>
+            <button id="absence-modal-close-btn" class="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+        <div class="p-5 space-y-4">
+            <div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-200">
+                <p>Chọn ngày để chạy lại tác vụ ghi nhận nhân viên vắng mặt cho ngày đó.</p>
+                <p class="mt-1"><strong>Lưu ý:</strong> Thao tác này sẽ xóa và tạo lại các bản ghi "Nghỉ" do hệ thống tự động tạo cho ngày đã chọn.</p>
+            </div>
+            <div class="mt-4 flex items-center gap-4">
+                <input type="text" id="absence-check-date" placeholder="Chọn ngày..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                <button id="run-absence-check-btn" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-orange-500 hover:to-amber-500 text-white px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 font-semibold transition text-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">Chạy cập nhật</button>
+            </div>
+            <p id="absence-check-status" class="mt-2 text-sm font-bold"></p>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+    // --- LOGIC BỘ LỌC BẬT/TẮT ---
+    document.addEventListener('DOMContentLoaded', function() {
+        // Lấy thông tin user từ biến global 'currentUser' do base.html cung cấp
+        const userRole = currentUser.role || '{{ user.role }}'; // Fallback
+        const isAdminOrBoss = userRole === 'admin' || userRole === 'boss';
+
+        const loadingEl = document.getElementById('loading');
+        const skeletonContainer = document.getElementById('skeleton-container');
+        const errorEl = document.getElementById('error'); // Giữ lại để báo lỗi
+        const tableEl = document.getElementById('results-table');
+        const tbodyEl = document.getElementById('results-tbody');
+        const theadEl = document.getElementById('results-thead');
+        const searchFiltersEl = document.getElementById('search-filters');
+
+        // Modal elements
+        const recordModal = document.getElementById('record-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        const modalCancelBtn = document.getElementById('modal-cancel-btn');
+        const recordForm = document.getElementById('record-form');
+        const addRecordBtn = document.getElementById('add-record-btn');
+
+        // Filter controls
+        const applyFiltersBtn = document.getElementById('apply-filters');
+        const clearFiltersBtn = document.getElementById('clear-filters');
+        const filterTypeEl = document.getElementById('filter-type');
+        const filterDateEl = document.getElementById('filter-date');
+        const filterNhanVienEl = document.getElementById('filter-nhan-vien');
+            const employeeFilterResults = document.getElementById('employee-filter-results');
+        const filterChucVuEl = document.getElementById('filter-chuc-vu');
+        const filterCnLamEl = document.getElementById('filter-cn-lam');
+        const filterSoCongEl = document.getElementById('filter-so-cong');
+        const filterTangCaEl = document.getElementById('filter-tang-ca');
+        const filterGhiChuEl = document.getElementById('filter-ghi-chu');
+        const filterNguoiThucHienEl = document.getElementById('filter-nguoi-thuc-hien');
+        const performerFilterResults = document.getElementById('performer-filter-results');
+
+        const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+
+        const containerSoCong = document.getElementById('container-filter-so-cong');
+        const containerTangCa = document.getElementById('container-filter-tang-ca');
+        const containerChucVu = document.getElementById('container-filter-chuc-vu');
+        const containerDichVu = document.getElementById('container-filter-dich-vu');
+        const containerSoPhong = document.getElementById('container-filter-so-phong');
+
+        let allRecords = [];
+        let lastCheckedCheckbox = null;
+        let currentSortBy = 'thoi_gian';
+        let currentSortOrder = 'desc';
+        
+        let listenersAttached = false; 
+
+        function fetchData(isSorting = false) {
+            skeletonContainer.classList.remove('hidden');
+            document.getElementById('results-table-container').classList.add('hidden');
+            loadingEl.classList.add('hidden'); // Không cần text "Đang tải" nữa
+            errorEl.classList.add('hidden');
+
+            const queryString = buildQueryString();
+
+            fetch(`/attendance/api/results-by-checker?${queryString}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
+                .then(data => {
+                    handleData(data, isSorting);
+                    updateDashboard(data.dashboard_stats || {});
+                    updateSortIndicators();
+                })
+                .catch(handleError);
+        }
+
+        let currentPage = 1;
+        let recordsPerPage = parseInt(localStorage.getItem('recordsPerPage')) || 100;
+        const perPageSelect = document.getElementById('per-page-select');
+
+        if (perPageSelect) {
+            perPageSelect.value = recordsPerPage;
+            perPageSelect.addEventListener('change', () => {
+                recordsPerPage = parseInt(perPageSelect.value, 10);
+                localStorage.setItem('recordsPerPage', recordsPerPage);
+                currentPage = 1; 
+                fetchData();
+            });
+        }
+
+        function buildQueryString() {
+            const params = new URLSearchParams();
+            params.append('page', currentPage);
+            params.append('per_page', recordsPerPage);
+
+            params.append('sort_by', currentSortBy);
+            params.append('sort_order', currentSortOrder);
+
+            const filterType = filterTypeEl ? filterTypeEl.value : 'all';
+            if (filterType && filterType !== 'all') params.append('filter_type', filterType);
+            
+            if (filterDateEl.value) {
+                const dateValue = filterDateEl.value.trim();
+                const parts = dateValue.split('/');
+                if (parts.length === 3 && parts[2] && parts[2].length === 4) {
+                    const [d, m, y] = parts;
+                    params.append('filter_date', `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
+                }
+            }
+            if (filterNhanVienEl && filterNhanVienEl.value) params.append('filter_nhan_vien', filterNhanVienEl.value.trim());
+            if (filterChucVuEl && filterChucVuEl.value) params.append('filter_chuc_vu', filterChucVuEl.value);
+            if (filterCnLamEl && filterCnLamEl.value) params.append('filter_cn_lam', filterCnLamEl.value.trim());
+            if (filterSoCongEl.value) params.append('filter_so_cong', filterSoCongEl.value);
+            if (filterTangCaEl && filterTangCaEl.value && filterTangCaEl.value !== 'all') params.append('filter_tang_ca', filterTangCaEl.value);
+            if (filterGhiChuEl.value) params.append('filter_ghi_chu', filterGhiChuEl.value.trim());
+
+            const filterDichVuEl = document.getElementById('filter-dich-vu');
+            const filterSoPhongEl = document.getElementById('filter-so-phong');
+            if (filterDichVuEl && filterDichVuEl.value) params.append('filter_dich_vu', filterDichVuEl.value.trim());
+            if (filterSoPhongEl && filterSoPhongEl.value) params.append('filter_so_phong', filterSoPhongEl.value.trim());
+
+            if (isAdminOrBoss && filterNguoiThucHienEl && filterNguoiThucHienEl.value) {
+                params.append('filter_nguoi_thuc_hien', filterNguoiThucHienEl.value.trim());
+            }
+
+            return params.toString();
+        }
+
+        // --- LOGIC MỚI CHO DASHBOARD ---
+        function animateCountUp(element, target) {
+            const start = parseInt(element.dataset.countup) || 0;
+            const duration = 800; // ms
+            let startTime = null;
+
+            function animation(currentTime) {
+                if (!startTime) startTime = currentTime;
+                const progress = Math.min((currentTime - startTime) / duration, 1);
+                const current = Math.floor(progress * (target - start) + start);
+                element.textContent = current.toLocaleString('vi-VN');
+                if (progress < 1) {
+                    requestAnimationFrame(animation);
+                } else {
+                    element.textContent = target.toLocaleString('vi-VN');
+                    element.dataset.countup = target;
+                }
+            }
+            requestAnimationFrame(animation);
+        }
+
+        function updateDashboard(stats) {
+            animateCountUp(document.getElementById('stat-total-absences'), stats.total_absences || 0);
+            animateCountUp(document.getElementById('stat-total-work-units'), stats.total_work_units || 0);
+            animateCountUp(document.getElementById('stat-total-overtime'), stats.total_overtime || 0);
+            animateCountUp(document.getElementById('stat-total-services'), stats.total_services || 0); 
+        }
+
+        function toggleFilterVisibility() {
+            const selectedType = filterTypeEl ? filterTypeEl.value : 'all';
+            if (selectedType === 'Dịch vụ') {
+                if (containerSoCong) containerSoCong.style.display = 'none';
+                if (containerChucVu) containerChucVu.style.display = 'none';
+                if (containerDichVu) containerDichVu.style.display = 'block';
+                if (containerSoPhong) containerSoPhong.style.display = 'block';
+            } else {
+                if (containerSoCong) containerSoCong.style.display = 'block';
+                if (containerChucVu) containerChucVu.style.display = 'block';
+                if (containerDichVu) containerDichVu.style.display = 'none';
+                if (containerSoPhong) containerSoPhong.style.display = 'none';
+            }
+        }
+
+        function updateSelectAllCheckboxState() {
+            const selectAllCheckbox = document.getElementById('select-all-checkbox');
+            if (!selectAllCheckbox) return;
+
+            const rowCheckboxes = tbodyEl.querySelectorAll('.row-checkbox');
+            const totalRows = rowCheckboxes.length;
+            if (totalRows === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+                return;
+            }
+
+            const checkedRows = tbodyEl.querySelectorAll('.row-checkbox:checked').length;
+
+            if (checkedRows === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (checkedRows < totalRows) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            } else { // checkedRows === totalRows
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            }
+        }
+
+        function updateDeleteButtonState() {
+            if (!isAdminOrBoss || !deleteSelectedBtn) return;
+            const selectedCheckboxes = tbodyEl.querySelectorAll('.row-checkbox:checked');
+            if (selectedCheckboxes.length > 0) {
+                deleteSelectedBtn.classList.remove('hidden');
+                // Cập nhật nội dung của nút để hiển thị số lượng
+                deleteSelectedBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                    Xóa ( ${selectedCheckboxes.length} ) mục`;
+            } else {
+                deleteSelectedBtn.classList.add('hidden');
+            }
+        }
+
+        function setupCheckboxListeners() { // ĐÃ SỬA LỖI
+            // KHỐI LỆNH `if (selectAllCheckbox)` ĐÃ BỊ XÓA KHỎI ĐÂY
+
+            // Sửa lỗi: Gắn sự kiện click vào document để xử lý cả checkbox hàng và Shift+Click
+            // Điều này tránh được vấn đề event bubbling từ thead xuống tbody
+            document.addEventListener('click', function(e) {
+                // Chỉ xử lý khi click vào một checkbox của hàng
+                if (e.target.tagName === 'INPUT' && e.target.classList.contains('row-checkbox')) {
+                    const checkbox = e.target;
+
+                    // Xử lý Shift + Click
+                    if (e.shiftKey && lastCheckedCheckbox && lastCheckedCheckbox !== checkbox) {
+                        const allCheckboxes = Array.from(tbodyEl.querySelectorAll('.row-checkbox'));
+                        const start = allCheckboxes.indexOf(lastCheckedCheckbox);
+                        const end = allCheckboxes.indexOf(checkbox);
+
+                        const rangeStart = Math.min(start, end);
+                        const rangeEnd = Math.max(start, end);
+                        const isChecked = checkbox.checked;
+                        for (let i = rangeStart; i <= rangeEnd; i++) {
+                            allCheckboxes[i].checked = isChecked;
+                        }
+                    }
+                    lastCheckedCheckbox = checkbox; // Cập nhật checkbox "neo"
+                    updateDeleteButtonState();
+                    updateSelectAllCheckboxState();
+                }
+            });
+            
+            // KHỐI LỆNH BỊ LẶP Ở ĐÂY ĐÃ ĐƯỢC XÓA
+        }
+
+        if (deleteSelectedBtn) {
+            deleteSelectedBtn.addEventListener('click', () => {
+                const selected = [];
+                tbodyEl.querySelectorAll('.row-checkbox:checked').forEach(checkbox => {
+                    selected.push({
+                        id: parseInt(checkbox.dataset.id, 10),
+                        type: checkbox.dataset.type
+                    });
+                });
+
+                if (selected.length === 0) {
+                    alert('Vui lòng chọn ít nhất một bản ghi để xóa.');
+                    return;
+                }
+
+                if (confirm(`Bạn có chắc chắn muốn xóa ${selected.length} bản ghi đã chọn không?`)) {
+                    fetch('/attendance/api/records/batch-delete', {
+                        method: 'DELETE', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ records: selected })
+                    }).then(res => res.ok ? res.json() : res.json().then(err => Promise.reject(err)))
+                    .then(data => {
+                        if (data.status === 'success') {
+                            showToast('delete', `Đã xóa thành công ${data.deleted_count} bản ghi.`);
+                            fetchData();
+                        } else {
+                            throw new Error(data.detail || 'Lỗi không xác định');
+                        }
+                    }).catch(err => alert(`Lỗi khi xóa hàng loạt: ${err.message || 'Lỗi server'}`));
+                }
+            });
+        }
+
+        function setupSoCongFilter() {
+            const filterType = filterTypeEl ? filterTypeEl.value : 'all';
+            filterSoCongEl.innerHTML = '<option value="">Tất cả</option>'; 
+
+            const options = ['0', '0.5', '1', '1.5', '2'];
+            containerSoCong.style.display = 'block';
+
+            options.forEach(opt => {
+                const optionEl = document.createElement('option');
+                optionEl.value = opt;
+                optionEl.textContent = opt;
+                filterSoCongEl.appendChild(optionEl);
+            });
+        }
+
+
+        function renderTable(records) {
+            let headersHtml = '';
+            let rowsHtml = '';
+
+            const currentFilter = filterTypeEl ? filterTypeEl.value : 'all';
+
+            // SỬA: Đây là class mới cho hàng, giống lost_and_found.html
+            const rowBaseClass = "bg-white border-b dark:bg-slate-900 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors duration-150";
+
+            const headerCheckbox = `${isAdminOrBoss ? '<th scope="col" class="w-12 px-4 py-3 text-center"><input type="checkbox" id="select-all-checkbox" class="h-4 w-4 rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 bg-white dark:bg-slate-700"></th>' : ''}`;
+            
+            // SỬA: Đổi `td` của checkbox sang `th` cho đúng ngữ nghĩa
+            const rowCheckbox = (rec, type) => `${isAdminOrBoss ? `<td class="px-4 py-3 text-center"><input type="checkbox" class="row-checkbox h-4 w-4 rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 bg-white dark:bg-slate-700 pointer-events-auto" data-id="${rec.id}" data-type="${type}"></td>` : ''}`;
+            
+            // SỬA: Thêm class 'pointer-events-auto' cho các nút
+            const performerCell = (rec) => `${isAdminOrBoss ? `<td class="px-4 py-3">${rec.ten_nguoi_thuc_hien || ''}</td>` : ''}`;
+            const actionCell = (rec, type) => `${isAdminOrBoss ? `<td class="px-4 py-3 whitespace-nowrap text-center"><button class="edit-btn text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300 transition mr-2 pointer-events-auto" data-id="${rec.id}" data-type="${type}" title="Sửa"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"></path></svg></button><button class="delete-btn text-rose-600 hover:text-rose-800 dark:text-rose-400 dark:hover:text-rose-300 transition pointer-events-auto" data-id="${rec.id}" data-type="${type}" title="Xóa"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg></button></td>` : ''}`;
+
+            // SỬA: Đổi `th` thành `scope="col" class="px-4 py-3 ..."`
+            if (currentFilter === 'Điểm danh') {
+                headersHtml = `<tr>
+                    ${headerCheckbox}
+                    <th scope="col" class="px-4 py-3 sortable" data-sort="thoi_gian">Ngày<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3">Giờ</th>${isAdminOrBoss ? '<th scope="col" class="px-4 py-3 sortable" data-sort="nguoi_thuc_hien">Người thực hiện<span class="sort-indicator"></span></th>' : ''}<th scope="col" class="px-4 py-3 sortable" data-sort="ma_nv">Mã NV<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="ten_nv">Tên NV<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="chuc_vu">Chức vụ<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="chi_nhanh_lam">CN Làm<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="la_tang_ca">Tăng ca<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="so_cong">Số công<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3">Ghi chú</th>${isAdminOrBoss ? '<th scope="col" class="px-4 py-3 text-center">Hành động</th>' : ''}</tr>`;
+                records.forEach((rec, index) => {
+                    const [ngay, gio] = rec.thoi_gian.split(' ');
+                    rowsHtml += `<tr class="${rowBaseClass}" data-record='${JSON.stringify(rec)}'>${rowCheckbox(rec, 'attendance')}<td class="px-4 py-3">${ngay||''}</td><td class="px-4 py-3">${gio||''}</td>${performerCell(rec)}<td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-200">${rec.ma_nv||''}</td><td class="px-4 py-3">${rec.ten_nv||''}</td><td class="px-4 py-3">${rec.chuc_vu||'Không rõ'}</td><td class="px-4 py-3">${rec.chi_nhanh_lam||''}</td><td class="px-4 py-3">${rec.tang_ca ? 'Có' : 'Không'}</td><td class="px-4 py-3">${rec.so_cong}</td><td class="px-4 py-3">${rec.ghi_chu||''}</td>${actionCell(rec, 'attendance')}</tr>`;
+                });
+            } else if (currentFilter === 'Dịch vụ') {
+                headersHtml = `<tr>
+                    ${headerCheckbox}
+                    <th scope="col" class="px-4 py-3 sortable" data-sort="thoi_gian">Ngày<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3">Giờ</th>${isAdminOrBoss ? '<th scope="col" class="px-4 py-3 sortable" data-sort="nguoi_thuc_hien">Người thực hiện<span class="sort-indicator"></span></th>' : ''}<th scope="col" class="px-4 py-3 sortable" data-sort="ma_nv">Mã NV<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="ten_nv">Tên NV<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="chuc_vu">Chức vụ<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="chi_nhanh_lam">CN Làm<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="la_tang_ca">Tăng ca<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="dich_vu">Dịch vụ<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="so_phong">Số phòng<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="so_luong">Số lượng<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3">Ghi chú</th>${isAdminOrBoss ? '<th scope="col" class="px-4 py-3 text-center">Hành động</th>' : ''}</tr>`;
+                records.forEach((rec, index) => {
+                    const [ngay, gio] = rec.thoi_gian.split(' ');
+                    rowsHtml += `<tr class="${rowBaseClass}" data-record='${JSON.stringify(rec)}'>${rowCheckbox(rec, 'service')}<td class="px-4 py-3">${ngay||''}</td><td class="px-4 py-3">${gio||''}</td>${performerCell(rec)}<td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-200">${rec.ma_nv||''}</td><td class="px-4 py-3">${rec.ten_nv||''}</td><td class="px-4 py-3">${rec.chuc_vu||'Không rõ'}</td><td class="px-4 py-3">${rec.chi_nhanh_lam||''}</td><td class="px-4 py-3">${rec.tang_ca ? 'Có' : 'Không'}</td><td class="px-4 py-3">${rec.dich_vu||''}</td><td class="px-4 py-3">${rec.so_phong||''}</td><td class="px-4 py-3">${rec.so_luong||''}</td><td class="px-4 py-3">${rec.ghi_chu||''}</td>${actionCell(rec, 'service')}</tr>`;
+                });
+            } else { // 'all'
+                headersHtml = `<tr>
+                    ${headerCheckbox}
+                    <th scope="col" class="px-4 py-3 sortable" data-sort="type">Loại<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="thoi_gian">Ngày<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3">Giờ</th>${isAdminOrBoss ? '<th scope="col" class="px-4 py-3 sortable" data-sort="nguoi_thuc_hien">Người thực hiện<span class="sort-indicator"></span></th>' : ''}<th scope="col" class="px-4 py-3 sortable" data-sort="ma_nv">Mã NV<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="ten_nv">Tên NV<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="chuc_vu">Chức vụ<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="chi_nhanh_lam">CN Làm<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="la_tang_ca">Tăng ca<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="so_cong">Số công<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="dich_vu">Dịch vụ<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="so_phong">Số phòng<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3 sortable" data-sort="so_luong">Số lượng<span class="sort-indicator"></span></th><th scope="col" class="px-4 py-3">Ghi chú</th>${isAdminOrBoss ? '<th scope="col" class="px-4 py-3 text-center">Hành động</th>' : ''}</tr>`;
+                records.forEach((rec, index) => {
+                    const [ngay, gio] = rec.thoi_gian.split(' ');
+                    const isService = rec.type === 'Dịch vụ';
+                    const recordType = isService ? 'service' : 'attendance';
+                    rowsHtml += `
+                        <tr class="${rowBaseClass}" data-record='${JSON.stringify(rec)}'>
+                            ${rowCheckbox(rec, recordType)}
+                            <td class="px-4 py-3 font-semibold ${isService ? 'text-green-600' : 'text-blue-600'}">${rec.type}</td>
+                            <td class="px-4 py-3">${ngay||''}</td>
+                            <td class="px-4 py-3">${gio||''}</td>
+                            ${performerCell(rec)}
+                            <td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-200">${rec.ma_nv||''}</td>
+                            <td class="px-4 py-3">${rec.ten_nv||''}</td>
+                            <td class="px-4 py-3">${rec.chuc_vu||'Không rõ'}</td>
+                            <td class="px-4 py-3">${rec.chi_nhanh_lam||''}</td>
+                            <td class="px-4 py-3">${rec.tang_ca ? 'Có' : 'Không'}</td>
+                            <td class="px-4 py-3">${rec.so_cong != null ? rec.so_cong : ''}</td>
+                            <td class="px-4 py-3">${rec.dich_vu || ''}</td>
+                            <td class="px-4 py-3">${rec.so_phong || ''}</td>
+                            <td class="px-4 py-3">${rec.so_luong || ''}</td>
+                            <td class="px-4 py-3">${rec.ghi_chu || ''}</td>
+                            ${actionCell(rec, recordType)}
+                        </tr>
+                    `;
+                });
+            }
+
+            theadEl.innerHTML = headersHtml;
+            tbodyEl.innerHTML = rowsHtml;
+
+            if (records.length === 0) {
+                const colspan = theadEl.querySelector('tr')?.children.length || 9;
+                tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="text-center py-16 text-slate-500 dark:text-slate-400">Không có dữ liệu cho bộ lọc này.</td></tr>`;
+            } else {
+                lastCheckedCheckbox = null; 
+            }
+        }
+
+        function renderPagination(currentPageNum, totalPages, totalRecords) {
+            const paginationEl = document.getElementById('pagination-controls');
+            const recordCountEl = document.getElementById('record-count');
+            paginationEl.innerHTML = '';
+
+            if (totalRecords === 0) {
+                recordCountEl.textContent = 'Không có bản ghi nào.';
+                return;
+            }
+
+            recordCountEl.textContent = `Hiển thị ${allRecords.length} / ${totalRecords} bản ghi.`;
+
+            if (totalPages <= 1) return;
+
+            const createButton = (text, page, isDisabled = false, isCurrent = false) => {
+                const button = document.createElement('button');
+                button.innerHTML = text; 
+                button.dataset.page = page;
+
+                let baseClasses = 'px-3 py-1 border text-sm font-semibold transition';
+                
+                if (isCurrent) {
+                    button.className = `${baseClasses} rounded-full bg-blue-600 text-white font-semibold shadow cursor-default`;
+                    button.disabled = true;
+                } else if (isDisabled) {
+                    button.className = `${baseClasses} rounded-full bg-transparent border-transparent text-slate-400 dark:text-slate-600 cursor-not-allowed`;
+                    button.disabled = true;
+                } else {
+                    button.className = `${baseClasses} rounded-full border-slate-300 dark:border-slate-700 hover:bg-blue-100 dark:hover:bg-slate-700 hover:border-blue-100 dark:hover:border-slate-700`;
+                    button.addEventListener('click', () => {
+                        currentPage = page;
+                        fetchData();
+                    });
+                }
+                return button;
+            };
+
+            paginationEl.appendChild(createButton('&laquo;', 1, currentPageNum === 1));
+            paginationEl.appendChild(createButton('&lsaquo;', currentPageNum - 1, currentPageNum === 1));
+
+            let startPage, endPage;
+            if (totalPages <= 7) {
+                startPage = 1; endPage = totalPages;
+            } else {
+                if (currentPageNum <= 4) { startPage = 1; endPage = 5; }
+                else if (currentPageNum + 3 >= totalPages) { startPage = totalPages - 4; endPage = totalPages; }
+                else { startPage = currentPageNum - 2; endPage = currentPageNum + 2; }
+            }
+
+            if (startPage > 1) {
+                paginationEl.appendChild(createButton('1', 1));
+                if (startPage > 2) paginationEl.insertAdjacentHTML('beforeend', `<span class="px-2 text-slate-400">...</span>`);
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                paginationEl.appendChild(createButton(i, i, false, i === currentPageNum));
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) paginationEl.insertAdjacentHTML('beforeend', `<span class="px-2 text-slate-400">...</span>`);
+                paginationEl.appendChild(createButton(totalPages, totalPages));
+            }
+
+            paginationEl.appendChild(createButton('&rsaquo;', currentPageNum + 1, currentPageNum === totalPages));
+            paginationEl.appendChild(createButton('&raquo;', totalPages, currentPageNum === totalPages));
+        }
+
+        function handleData(data, isSorting = false) {
+            lastCheckedCheckbox = null; 
+            skeletonContainer.classList.add('hidden');
+            // SỬA: Trỏ đến ID của container mới
+            const tableContainer = document.getElementById('results-table-container'); 
+            
+            if (data && data.records) {
+                tableContainer.classList.remove('hidden'); // Hiển thị container
+                allRecords = data.records;
+                if (!isSorting) {
+                    renderTable(data.records);
+                } else {
+                    tbodyEl.innerHTML = renderTable(data.records, true); 
+                }
+                renderPagination(data.currentPage, data.totalPages, data.totalRecords);                    
+            } else {
+                tableContainer.classList.add('hidden'); // Ẩn container nếu không có dữ liệu
+                renderTable([]); 
+                renderPagination(0, 0, 0);
+            }
+            if (isAdminOrBoss) {
+                updateDeleteButtonState();
+                updateSelectAllCheckboxState();
+            }
+        }
+
+        function handleError(error) {
+            console.error('Error fetching attendance data:', error);
+            skeletonContainer.classList.add('hidden');
+            errorEl.classList.remove('hidden');
+        }
+
+        function updateSortIndicators() {
+            document.querySelectorAll('.sortable').forEach(th => {
+                th.classList.remove('asc', 'desc');
+                const indicator = th.querySelector('.sort-indicator');
+                if (th.dataset.sort === currentSortBy) {
+                    th.classList.add(currentSortOrder);
+                    indicator.innerHTML = currentSortOrder === 'asc' ? '&#9650;' : '&#9660;'; 
+                } else {
+                    indicator.innerHTML = '&#8693;'; 
+                }
+            });
+        }
+
+        applyFiltersBtn.addEventListener('click', () => {
+            currentPage = 1;
+            fetchData();
+        });
+
+        // Thêm sự kiện tự động áp dụng cho các ô select
+        const filterSelects = searchFiltersEl.querySelectorAll('select');
+        filterSelects.forEach(select => {
+            select.addEventListener('change', function() {
+                // Kích hoạt sự kiện click của nút "Áp dụng" khi giá trị thay đổi
+                applyFiltersBtn.click();
+            });
+        });
+
+
+        // Thêm sự kiện nhấn Enter cho các ô input trong bộ lọc
+        const filterInputs = searchFiltersEl.querySelectorAll('input[type="text"], input[type="search"]');
+        filterInputs.forEach(input => {
+            input.addEventListener('keydown', function(event) {
+                // Kiểm tra nếu phím được nhấn là 'Enter'
+                if (event.key === 'Enter') {
+                    // Ngăn hành vi mặc định (ví dụ: submit form)
+                    event.preventDefault();
+                    // Kích hoạt sự kiện click của nút "Áp dụng"
+                    applyFiltersBtn.click();
+                }
+            });
+        });
+
+        clearFiltersBtn.addEventListener('click', () => {
+            filterDateEl.value = '';
+            if (filterNhanVienEl) filterNhanVienEl.value = '';
+            if (filterChucVuEl) filterChucVuEl.selectedIndex = 0;
+            if (filterCnLamEl) filterCnLamEl.value = '';
+            filterSoCongEl.value = '';
+            if (filterTangCaEl) filterTangCaEl.value = 'all';
+            if (filterGhiChuEl) filterGhiChuEl.value = '';
+            if (isAdminOrBoss) {
+                filterNguoiThucHienEl.value = '';
+            }
+            if (filterTypeEl) {
+                filterTypeEl.value = 'all';
+            }
+            const filterDichVuEl = document.getElementById('filter-dich-vu');
+            const filterSoPhongEl = document.getElementById('filter-so-phong');
+            if (filterDichVuEl) filterDichVuEl.value = '';
+            if (filterSoPhongEl) filterSoPhongEl.value = '';
+
+            currentPage = 1;
+            fetchData();
+        });
+
+        if (filterTypeEl) {
+            filterTypeEl.addEventListener('change', () => {
+                currentPage = 1;
+                toggleFilterVisibility();
+                fetchData();
+            });
+        }
+
+        // --- Modal Logic ---
+        if (isAdminOrBoss) {
+            // --- Absence Check Modal Logic ---
+            const openAbsenceModalBtn = document.getElementById('open-absence-modal-btn');
+            const absenceCheckModal = document.getElementById('absence-check-modal');
+            const absenceModalCloseBtn = document.getElementById('absence-modal-close-btn');
+            const runAbsenceBtn = document.getElementById('run-absence-check-btn');
+            const absenceDateInput = document.getElementById('absence-check-date');
+            const absenceStatusEl = document.getElementById('absence-check-status');
+
+            if (openAbsenceModalBtn) {
+                openAbsenceModalBtn.addEventListener('click', () => absenceCheckModal.classList.remove('hidden'));
+            }
+            if (absenceModalCloseBtn) {
+                absenceModalCloseBtn.addEventListener('click', () => absenceCheckModal.classList.add('hidden'));
+            }
+            if (runAbsenceBtn) {
+                runAbsenceBtn.addEventListener('click', function() {
+                    const dateValue = absenceDateInput.value.trim();
+                    const button = this;
+
+                    if (!dateValue) {
+                        alert('Vui lòng chọn ngày.');
+                        return;
+                    }
+
+                    const parts = dateValue.split('/');
+                    if (parts.length !== 3 || !parts[2] || parts[2].length !== 4) {
+                        alert('Định dạng ngày không hợp lệ. Vui lòng dùng dd/mm/yyyy.');
+                        return;
+                    }
+                    const [d, m, y] = parts;
+                    const formattedDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+
+                    button.disabled = true;
+                    button.textContent = 'Đang xử lý...';
+                    absenceStatusEl.textContent = 'Đang gửi yêu cầu...';
+                    absenceStatusEl.className = 'mt-2 text-sm font-bold text-blue-600';
+                    fetch('/api/attendance/run-absence-check', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ check_date: formattedDate })
+                    })
+                    .then(response => response.ok ? response.json() : response.json().then(err => Promise.reject(err)))
+                    .then(data => {
+                        if (data.status === 'success') {
+                            absenceStatusEl.textContent = data.message;
+                            absenceStatusEl.className = 'mt-2 text-sm font-bold text-green-600';
+                            setTimeout(() => {
+                                alert('Yêu cầu cập nhật đã được gửi. Kết quả sẽ được áp dụng sau vài phút.');
+                                absenceCheckModal.classList.add('hidden');
+                            }, 1000);
+                        } else {
+                            absenceStatusEl.textContent = 'Lỗi: ' + (data.detail || 'Không rõ nguyên nhân.');
+                            absenceStatusEl.className = 'mt-2 text-sm font-bold text-red-600';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        absenceStatusEl.textContent = 'Đã xảy ra lỗi: ' + (error.detail || 'Không thể gửi yêu cầu đến server.');
+                        absenceStatusEl.className = 'mt-2 text-sm font-bold text-red-600';
+                    })
+                    .finally(() => {
+                        setTimeout(() => {
+                            button.disabled = false;
+                            button.textContent = 'Chạy cập nhật';
+                        }, 2000);
+                    });
+                });
+            }
+
+            // --- Export to Excel Logic ---
+            const exportBtn = document.getElementById('export-attendance-btn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', function() {
+                    const params = new URLSearchParams();
+                    const filterType = document.getElementById('filter-type') ? document.getElementById('filter-type').value : '';
+                    const filterDateInput = document.getElementById('filter-date');
+                    let filterDate = '';
+                    if (filterDateInput && filterDateInput.value) {
+                        const parts = filterDateInput.value.split('/');
+                        if (parts.length === 3 && parts[2] && parts[2].length === 4) {
+                            filterDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                        }
+                    }
+                    const filterNhanVien = document.getElementById('filter-nhan-vien') ? document.getElementById('filter-nhan-vien').value : '';
+                    const filterChucVu = document.getElementById('filter-chuc-vu') ? document.getElementById('filter-chuc-vu').value : '';
+                    const filterCnLam = document.getElementById('filter-cn-lam') ? document.getElementById('filter-cn-lam').value : '';
+                    const filterSoCong = document.getElementById('filter-so-cong') ? document.getElementById('filter-so-cong').value : '';
+                    const filterTangCa = document.getElementById('filter-tang-ca') ? document.getElementById('filter-tang-ca').value : '';
+                    const filterGhiChu = document.getElementById('filter-ghi-chu') ? document.getElementById('filter-ghi-chu').value : '';
+                    const filterNguoiThucHien = document.getElementById('filter-nguoi-thuc-hien') ? document.getElementById('filter-nguoi-thuc-hien').value : '';
+                    const filterDichVu = document.getElementById('filter-dich-vu') ? document.getElementById('filter-dich-vu').value : '';
+                    const filterSoPhong = document.getElementById('filter-so-phong') ? document.getElementById('filter-so-phong').value : '';
+
+                    if (filterType && filterType !== 'all') params.append('filter_type', filterType);
+                    if (filterDate) params.append('filter_date', filterDate);
+                    if (filterNhanVien) params.append('filter_nhan_vien', filterNhanVien);
+                    if (filterChucVu) params.append('filter_chuc_vu', filterChucVu);
+                    if (filterCnLam) params.append('filter_cn_lam', filterCnLam);
+                    if (filterSoCong) params.append('filter_so_cong', filterSoCong);
+                    if (filterTangCa && filterTangCa !== 'all') params.append('filter_tang_ca', filterTangCa);
+                    if (filterGhiChu) params.append('filter_ghi_chu', filterGhiChu);
+                    if (filterNguoiThucHien) params.append('filter_nguoi_thuc_hien', filterNguoiThucHien);
+                    if (filterDichVu) params.append('filter_dich_vu', filterDichVu);
+                    if (filterSoPhong) params.append('filter_so_phong', filterSoPhong);
+
+                    const exportUrl = `/api/attendance/export-excel?${params.toString()}`;
+                    window.open(exportUrl, '_blank');
+                });
+            }
+
+            const modalRecordId = document.getElementById('modal-record-id');
+            const modalPerformerContainer = document.getElementById('modal-performer-container');
+            const modalNguoiThucHienSearch = document.getElementById('modal-nguoi-thuc-hien-search');
+            const modalNguoiThucHienCode = document.getElementById('modal-nguoi-thuc-hien-code');
+            const performerSearchResults = document.getElementById('performer-search-results');
+            const modalThoiGian = document.getElementById('modal-thoi-gian');
+            const modalChiNhanhLam = document.getElementById('modal-chi-nhanh-lam');
+            const modalLaTangCa = document.getElementById('modal-la-tang-ca');
+            const modalGhiChu = document.getElementById('modal-ghi-chu');
+            const modalSoCongNv = document.getElementById('modal-so-cong-nv');
+            const modalDichVu = document.getElementById('modal-dich-vu');
+            const modalSoPhong = document.getElementById('modal-so-phong');
+            const modalSoLuong = document.getElementById('modal-so-luong');
+            const attendanceFields = document.getElementById('modal-attendance-fields');
+            const serviceFields = document.getElementById('modal-service-fields');
+            const modalRecordType = document.getElementById('modal-record-type');
+            const modalTypeContainer = document.getElementById('modal-type-selector-container');
+            const modalMaNvSearch = document.getElementById('modal-ma-nv-search');
+            const modalMaNv = document.getElementById('modal-ma-nv');
+            const employeeSearchResults = document.getElementById('employee-search-results');
+
+            const closeModal = () => recordModal.classList.add('hidden');
+
+            const updateOvertimeStatus = () => {
+                const chiNhanhChinh = recordForm.dataset.chiNhanhChinh;
+                const chiNhanhLam = modalChiNhanhLam.value;
+                const soCong = parseFloat(modalSoCongNv.value);
+
+                if (recordForm.dataset.isSystemRecord === 'true') {
+                    return;
+                }
+                
+                let isOvertime = (soCong > 1);
+                if (chiNhanhChinh && chiNhanhLam) { 
+                    isOvertime = isOvertime || (chiNhanhLam !== chiNhanhChinh);
+                }
+                modalLaTangCa.checked = isOvertime;
+            };
+
+            modalChiNhanhLam.addEventListener('change', updateOvertimeStatus);
+            modalSoCongNv.addEventListener('input', updateOvertimeStatus);
+
+            const openModal = (mode, record = null) => {
+                recordForm.reset();
+                recordForm.removeAttribute('data-employee-role');
+                recordForm.removeAttribute('data-chi-nhanh-chinh');
+                recordForm.removeAttribute('data-is-system-record'); 
+                modalLaTangCa.disabled = false;
+
+                let recordType = 'attendance'; 
+                modalTypeContainer.style.display = mode === 'add' ? 'block' : 'none';
+
+                if (mode === 'edit' && record) {
+                    modalTitle.textContent = 'Chỉnh sửa bản ghi';
+                    recordType = record.type === 'Điểm danh' ? 'attendance' : 'service';
+                    modalRecordId.value = record.id; 
+
+                    recordForm.dataset.isSystemRecord = (record.ten_nguoi_thuc_hien && record.ten_nguoi_thuc_hien.includes('Hệ thống'));
+
+                    modalMaNv.value = record.ma_nv;
+                    modalMaNvSearch.value = record.ten_nv;
+                    modalGhiChu.value = record.ghi_chu || '';
+                    
+                    const [datePart, timePart] = record.thoi_gian.split(' ');
+                    const [h, min] = timePart.split(':');
+                    modalThoiGian.value = `${datePart} ${h}:${min}`;
+
+                    if (recordType === 'attendance') {
+                        const soCong = record.so_cong;
+                        if (soCong != null) { 
+                            modalSoCongNv.value = (soCong % 1 === 0) ? parseInt(soCong, 10) : soCong;
+                        } else {
+                            modalSoCongNv.value = '1'; 
+                        }
+                    } else {
+                        modalSoCongNv.value = ''; 
+                        modalDichVu.value = record.dich_vu;
+                        modalSoPhong.value = record.so_phong;
+                        modalSoLuong.value = record.so_luong;
+                    }
+
+                    const isKtvOrQuanLy = record.chuc_vu === 'Kỹ thuật viên' || record.chuc_vu === 'Quản lý';
+                    recordForm.dataset.chiNhanhChinh = record.chi_nhanh_chinh || '';
+                    const cnLamContainer = document.getElementById('modal-cn-lam-container');
+                    const tangCaContainer = document.getElementById('modal-tang-ca-container');
+                    const performerContainer = document.getElementById('modal-performer-container');
+
+                    if (isKtvOrQuanLy) {
+                        cnLamContainer.style.display = 'none';
+                        tangCaContainer.style.display = 'none';
+                        performerContainer.style.display = 'none';
+                        modalLaTangCa.disabled = true;
+
+                        modalChiNhanhLam.value = record.chi_nhanh_chinh;
+                        modalNguoiThucHienCode.value = record.ma_nv;
+                        modalNguoiThucHienSearch.value = record.ma_nv;
+                        
+                        modalLaTangCa.checked = (record.so_cong || 0) > 1.0;
+                    } else {
+                        modalLaTangCa.disabled = true; 
+                        cnLamContainer.style.display = 'block';
+                        modalChiNhanhLam.disabled = false;
+                        tangCaContainer.style.display = 'block';
+                        performerContainer.style.display = 'block';
+
+                        modalChiNhanhLam.value = record.chi_nhanh_lam || '';
+                        modalNguoiThucHienCode.value = record.ma_nguoi_thuc_hien || '';
+                        modalNguoiThucHienSearch.value = record.ten_nguoi_thuc_hien ? `${record.ten_nguoi_thuc_hien} (${record.ma_nguoi_thuc_hien})` : '';
+                        
+                        modalLaTangCa.checked = record.tang_ca;
+                    }
+
+                } else { // 'add' mode
+                    modalTitle.textContent = 'Thêm bản ghi mới';
+                    modalRecordId.value = '';
+                    recordForm.dataset.chiNhanhChinh = ''; 
+
+                    const filterType = document.getElementById('filter-type').value;
+                    if (filterType && filterType !== 'all') {
+                        modalRecordType.value = (filterType === 'Điểm danh') ? 'attendance' : 'service';
+                    } else {
+                        modalRecordType.value = 'attendance'; 
+                    }
+
+                    const filterDate = document.getElementById('filter-date').value;
+                    if (filterDate) {
+                        const now = new Date();
+                        const hours = String(now.getHours()).padStart(2, '0');
+                        const minutes = String(now.getMinutes()).padStart(2, '0');
+                        modalThoiGian.value = `${filterDate} ${hours}:${minutes}`;
+                    }
+
+                    const filterNguoiThucHien = document.getElementById('filter-nguoi-thuc-hien').value;
+                    if (filterNguoiThucHien) {
+                        modalNguoiThucHienSearch.value = filterNguoiThucHien;
+                        modalNguoiThucHienCode.value = filterNguoiThucHien;
+                    } else {
+                        modalNguoiThucHienSearch.value = '{{ user.name }}'; // Sử dụng tên từ user
+                        modalNguoiThucHienCode.value = '{{ user.code }}'; // Sử dụng code từ user
+                    }
+
+                    const filterNhanVien = document.getElementById('filter-nhan-vien').value;
+                    if (filterNhanVien) modalMaNvSearch.value = filterNhanVien;
+
+                    const filterCnLam = document.getElementById('filter-cn-lam').value;
+                    modalChiNhanhLam.value = filterCnLam || ''; 
+
+                    const filterDichVu = document.getElementById('filter-dich-vu').value;
+                    if (filterDichVu) modalDichVu.value = filterDichVu;
+
+                    const filterSoPhong = document.getElementById('filter-so-phong').value;
+                    if (filterSoPhong) modalSoPhong.value = filterSoPhong;
+
+                    const filterSoCong = document.getElementById('filter-so-cong').value;
+                    if (filterSoCong) modalSoCongNv.value = filterSoCong;
+
+                    const filterGhiChu = document.getElementById('filter-ghi-chu').value;
+                    if (filterGhiChu) modalGhiChu.value = filterGhiChu;
+                    
+                    document.getElementById('modal-cn-lam-container').style.display = 'block';
+                    modalChiNhanhLam.disabled = false;
+                    document.getElementById('modal-tang-ca-container').style.display = 'block';
+                    document.getElementById('modal-performer-container').style.display = 'block';
+                    modalLaTangCa.disabled = true; 
+                    recordType = modalRecordType.value;
+                    
+                    setTimeout(updateOvertimeStatus, 50);
+
+                }
+
+                toggleModalFields(recordType);
+                recordModal.classList.remove('hidden');
+            };
+
+            const toggleModalFields = (type) => {
+                if (type === 'attendance') {
+                    attendanceFields.style.display = 'block';
+                    serviceFields.style.display = 'none';
+                    modalSoCongNv.required = true;
+                } else {
+                    attendanceFields.style.display = 'none';
+                    serviceFields.style.display = 'block';
+                    modalSoCongNv.required = false;
+                }
+            };
+
+            addRecordBtn.addEventListener('click', () => openModal('add'));
+            modalCloseBtn.addEventListener('click', closeModal);
+            modalCancelBtn.addEventListener('click', closeModal);
+            modalRecordType.addEventListener('change', () => toggleModalFields(modalRecordType.value));
+            
+            // SỬA LỖI: Thay đổi cách bắt sự kiện click trên tbody
+            tbodyEl.addEventListener('click', (e) => {
+                // Tìm nút edit-btn gần nhất với nơi được click
+                const editButton = e.target.closest('.edit-btn');
+                if (editButton) {
+                    const recordRow = editButton.closest('tr');
+                    const record = JSON.parse(recordRow.dataset.record);
+                    openModal('edit', record);
+                    return; // Dừng lại để không xử lý các sự kiện khác
+                }
+                // Tìm nút delete-btn gần nhất với nơi được click
+                const deleteButton = e.target.closest('.delete-btn');
+                if (deleteButton) {
+                    const recordId = deleteButton.dataset.id;
+                    const recordType = deleteButton.dataset.type;
+                    if (confirm('Bạn có chắc chắn muốn xóa bản ghi này không?')) {
+                        fetch(`/attendance/api/record/${recordType}/${recordId}`, { method: 'DELETE' })
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.status === 'success') {
+                                    showToast('delete');
+                                    fetchData();
+                                } else {
+                                    throw new Error(data.detail || 'Lỗi không xác định');
+                                }
+                            })
+                            .catch(err => alert(`Lỗi khi xóa: ${err.message}`));
+                    }
+                }
+            });
+
+            recordForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const recordId = modalRecordId.value;
+                const isEdit = !!recordId;
+
+                if (!isEdit) {
+                    const employeeRole = recordForm.dataset.employeeRole || '';
+                    const isKtvOrQuanLy = employeeRole === 'ktv' || employeeRole === 'quanly';
+                    const recordType = modalRecordType.value;
+
+                    const validateField = (input, message, checkNumeric = false) => {
+                        const value = input.value.trim();
+                        let searchInput;
+                        if (input.id === 'modal-ma-nv') {
+                            searchInput = document.getElementById('modal-ma-nv-search');
+                        } else if (input.id === 'modal-nguoi-thuc-hien-code') {
+                            searchInput = document.getElementById('modal-nguoi-thuc-hien-search');
+                        }
+                        const targetInput = searchInput || input;
+
+                        if (!value) {
+                            alert(message);
+                            targetInput.focus();
+                            return false;
+                        }
+                        if (checkNumeric && (isNaN(parseFloat(value)) || parseFloat(value) <= 0)) {
+                            alert(message);
+                            targetInput.focus();
+                            return false;
+                        }
+                        return true;
+                    };
+
+                    if (!isKtvOrQuanLy && !validateField(modalNguoiThucHienCode, 'Vui lòng chọn người thực hiện.')) return;
+                    if (!validateField(modalMaNv, 'Vui lòng chọn một nhân viên.')) return;
+                    if (!validateField(modalThoiGian, 'Vui lòng nhập thời gian.')) return;
+                    if (!isKtvOrQuanLy && !validateField(modalChiNhanhLam, 'Vui lòng chọn chi nhánh làm việc.')) return;
+
+                    if (recordType === 'attendance') {
+                        if (!validateField(modalSoCongNv, 'Vui lòng nhập số công hợp lệ (lớn hơn 0).', true)) return;
+                    } else { // service
+                        if (!validateField(modalDichVu, 'Vui lòng chọn dịch vụ.')) return;
+                        if (!validateField(modalSoPhong, 'Vui lòng nhập số phòng.')) return;
+                        if (!validateField(modalSoLuong, 'Vui lòng nhập số lượng.')) return;
+                    }
+                }
+                
+                const formData = new FormData(recordForm);
+                formData.set('la_tang_ca', modalLaTangCa.checked);
+
+                const recordType = isEdit ? (allRecords.find(r => r.id == recordId).type === 'Điểm danh' ? 'attendance' : 'service') : modalRecordType.value;
+
+                const url = isEdit ? `/attendance/api/manual-record/${recordType}/${recordId}` : '/attendance/api/manual-record';
+
+                fetch(url, { method: 'POST', body: formData })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success') {                            
+                            showToast(isEdit ? 'update' : 'add', data.message);
+                            closeModal();
+                            fetchData();
+                        } else {
+                            throw new Error(data.detail || 'Lỗi không xác định');
+                        }
+                    })
+                    .catch(err => alert(`Lỗi khi lưu: ${err.message}`));
+            });
+
+            // Performer search in modal
+            let performerSearchTimeout;
+            modalNguoiThucHienSearch.addEventListener('input', () => {
+                clearTimeout(performerSearchTimeout);
+                modalNguoiThucHienCode.value = ''; 
+                const query = modalNguoiThucHienSearch.value.trim();
+                if (query === '') {
+                    performerSearchResults.classList.add('hidden');
+                    return;
+                }
+                if (query.length < 2) {
+                    return;
+                }
+                performerSearchTimeout = setTimeout(() => {
+                    fetch(`/api/users/search-checkers?q=${encodeURIComponent(query)}`)
+                        .then(res => res.json())
+                        .then(performers => {
+                            performerSearchResults.innerHTML = '';
+                            if (performers.length > 0) {
+                                performers.forEach(p => {
+                                    const div = document.createElement('div');
+                                    div.className = 'p-2 hover:bg-gray-100 dark:hover:bg-slate-600 cursor-pointer';
+                                    div.textContent = `${p.name} (${p.code})`;
+                                    div.onclick = () => {
+                                        modalNguoiThucHienSearch.value = p.name;
+                                        modalNguoiThucHienCode.value = p.code;
+                                        performerSearchResults.classList.add('hidden');
+                                    };
+                                    performerSearchResults.appendChild(div);
+                                });
+                                performerSearchResults.classList.remove('hidden');
+                            } else {
+                                performerSearchResults.classList.add('hidden');
+                            }
+                        });
+                }, 300);
+            });
+            // Employee search in modal
+            let searchTimeout;
+            modalMaNvSearch.addEventListener('input', () => {
+                clearTimeout(searchTimeout);
+                modalMaNv.value = ''; 
+                const query = modalMaNvSearch.value.trim();
+                if (query === '') {
+                    employeeSearchResults.classList.add('hidden');
+                    return;
+                }
+                if (query.length < 2) {
+                    employeeSearchResults.classList.add('hidden');
+                    return;
+                }
+                searchTimeout = setTimeout(() => {
+                    const isEditMode = !!document.getElementById('modal-record-id').value;
+                    const modalRecordTypeEl = document.getElementById('modal-record-type');
+                    let isServiceMode = false;
+
+                    if (isEditMode) {
+                        const recordId = parseInt(document.getElementById('modal-record-id').value, 10);
+                        const currentRecord = allRecords.find(r => r.id === recordId);
+                        isServiceMode = currentRecord && currentRecord.type === 'Dịch vụ';
+                    } else { 
+                        isServiceMode = modalRecordTypeEl.value === 'service';
+                    }
+
+                    const roleFilterParam = isServiceMode ? '&role_filter=buongphong' : '';
+                    fetch(`/attendance/api/employees/search?q=${encodeURIComponent(query)}${roleFilterParam}`)
+                        .then(res => res.json())
+                        .then(employees => {
+                            employeeSearchResults.innerHTML = '';
+                            if (employees.length > 0) {
+                                employees.forEach(emp => {
+                                    const div = document.createElement('div');
+                                    div.className = 'p-2 hover:bg-gray-100 dark:hover:bg-slate-600 cursor-pointer';
+                                    div.textContent = `${emp.name} (${emp.code})`;
+                                    div.onclick = () => {
+                                        modalMaNvSearch.value = emp.name;
+                                        modalMaNv.value = emp.code;
+                                        employeeSearchResults.classList.add('hidden');
+
+                                        recordForm.dataset.chiNhanhChinh = emp.branch || '';
+                                        recordForm.dataset.employeeRole = emp.department || '';
+
+                                        const isKtvOrQuanLy = emp.department === 'ktv' || emp.department === 'quanly';
+                                        const cnLamContainer = document.getElementById('modal-cn-lam-container');
+                                        const tangCaContainer = document.getElementById('modal-tang-ca-container');
+                                        const performerContainer = document.getElementById('modal-performer-container');
+
+                                        if (isKtvOrQuanLy) {
+                                            cnLamContainer.style.display = 'none';
+                                            tangCaContainer.style.display = 'none';
+                                            performerContainer.style.display = 'none';
+                                            modalChiNhanhLam.value = emp.branch;
+                                            modalNguoiThucHienCode.value = emp.code;
+                                            modalNguoiThucHienSearch.value = emp.code;
+                                            modalLaTangCa.disabled = true;
+                                        } else {
+                                            cnLamContainer.style.display = 'block';
+                                            modalChiNhanhLam.disabled = false;
+                                            tangCaContainer.style.display = 'block';
+                                            performerContainer.style.display = 'block';
+                                            modalLaTangCa.disabled = true; 
+                                        }
+                                        
+                                        updateOvertimeStatus();
+                                    };
+                                    employeeSearchResults.appendChild(div);
+                                });
+                                employeeSearchResults.classList.remove('hidden');
+                            } else {
+                                employeeSearchResults.classList.add('hidden');
+                            }
+                        });
+                }, 300);
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!modalMaNvSearch.contains(e.target) && !employeeSearchResults.contains(e.target)) {
+                    employeeSearchResults.classList.add('hidden');
+                }
+                if (filterNhanVienEl && !filterNhanVienEl.contains(e.target) && employeeFilterResults && !employeeFilterResults.contains(e.target)) {
+                    employeeFilterResults.classList.add('hidden');
+                }
+            });
+
+            // Performer filter search
+            let performerFilterTimeout;
+            if (filterNguoiThucHienEl) {
+                filterNguoiThucHienEl.addEventListener('input', () => {
+                    clearTimeout(performerFilterTimeout);
+                    const query = filterNguoiThucHienEl.value.trim();
+                    if (query === '') {
+                        performerFilterResults.classList.add('hidden');
+                        return;
+                    }
+                    if (query.length < 2) return;
+
+                    performerFilterTimeout = setTimeout(() => {
+                        fetch(`/api/users/search-checkers?q=${encodeURIComponent(query)}`)
+                            .then(res => res.json())
+                            .then(performers => {
+                                performerFilterResults.innerHTML = '';
+                                if (performers.length > 0) {
+                                    performers.forEach(p => {
+                                        const div = document.createElement('div');
+                                        div.className = 'p-2 hover:bg-gray-100 dark:hover:bg-slate-600 cursor-pointer';
+                                        div.textContent = `${p.name} (${p.code})`;
+                                        div.onclick = () => {
+                                            filterNguoiThucHienEl.value = p.code;
+                                            performerFilterResults.classList.add('hidden');
+                                        };
+                                        performerFilterResults.appendChild(div);
+                                    });
+                                    performerFilterResults.classList.remove('hidden');
+                                } else {
+                                    performerFilterResults.classList.add('hidden');
+                                }
+                            });
+                    }, 300);
+                });
+            }
+        }
+
+        function attachStaticListeners() {
+            if (listenersAttached) return; 
+
+            theadEl.addEventListener('click', (e) => {
+                    // Check for sorting click
+                    const header = e.target.closest('.sortable');
+                    if (header) {
+                        const sortBy = header.dataset.sort;
+                        if (!sortBy) return;
+
+                        if (currentSortBy === sortBy) {
+                            currentSortOrder = currentSortOrder === 'desc' ? 'asc' : 'desc';
+                        } else {
+                            currentSortBy = sortBy;
+                            currentSortOrder = 'desc';
+                        }
+                        currentPage = 1;
+                        fetchData();
+                        return; // Đã xử lý sắp xếp, thoát
+                    }
+
+                    // Check for "Select All" checkbox click
+                    if (e.target.tagName === 'INPUT' && e.target.id === 'select-all-checkbox') {
+                        const checkbox = e.target;
+                        const isChecked = checkbox.checked;
+                        lastCheckedCheckbox = null;
+                        
+                        tbodyEl.querySelectorAll('.row-checkbox').forEach(rowCheckbox => {
+                            rowCheckbox.checked = isChecked;
+                        });
+                        
+                        checkbox.indeterminate = false;
+                        updateDeleteButtonState();
+                        return; // Đã xử lý checkbox, thoát
+                    }
+            });
+
+            if (isAdminOrBoss) {
+                setupCheckboxListeners(); // Hàm này giờ chỉ gắn listener cho các hàng
+            }
+
+            listenersAttached = true; 
+        }
+
+        // Employee filter search (for the main filter bar)
+        let employeeFilterTimeout;
+        if (filterNhanVienEl && employeeFilterResults) {
+            filterNhanVienEl.addEventListener('input', () => {
+                clearTimeout(employeeFilterTimeout);
+                const query = filterNhanVienEl.value.trim();
+                if (query === '') {
+                    employeeFilterResults.classList.add('hidden');
+                    return;
+                }
+                if (query.length < 2) return;
+
+                employeeFilterTimeout = setTimeout(() => {
+                    fetch(`/attendance/api/employees/search?q=${encodeURIComponent(query)}&context=results_filter`)
+                        .then(res => res.json())
+                        .then(employees => {
+                            employeeFilterResults.innerHTML = '';
+                            if (employees.length > 0) {
+                                employees.forEach(emp => {
+                                    const div = document.createElement('div');
+                                    div.className = 'p-2 hover:bg-gray-100 dark:hover:bg-slate-600 cursor-pointer';
+                                    div.textContent = `${emp.name} (${emp.code})`;
+                                    div.onclick = () => {
+                                        filterNhanVienEl.value = emp.name;
+                                        employeeFilterResults.classList.add('hidden');
+                                    };
+                                    employeeFilterResults.appendChild(div);
+                                });
+                                employeeFilterResults.classList.remove('hidden');
+                            } else {
+                                employeeFilterResults.classList.add('hidden');
+                            }
+                        });
+            }, 300);
+            });
+        }
+
+        function generateSkeletonRows(count) {
+            const skeletonRowsEl = document.getElementById('skeleton-rows');
+            let html = '';
+            for (let i = 0; i < count; i++) {
+                html += `<tr class="skeleton-card">
+                    <td class="p-4"><div class="h-5 bg-slate-200 dark:bg-slate-700 rounded"></div></td><td class="p-4"><div class="h-5 bg-slate-200 dark:bg-slate-700 rounded"></div></td><td class="p-4"><div class="h-5 bg-slate-200 dark:bg-slate-700 rounded"></div></td><td class="p-4"><div class="h-5 bg-slate-200 dark:bg-slate-700 rounded"></div></td><td class="p-4"><div class="h-5 bg-slate-200 dark:bg-slate-700 rounded"></div></td><td class="p-4"><div class="h-5 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
+                </tr>`;
+            }
+            skeletonRowsEl.innerHTML = html;
+        }
+        // Initial data fetch
+        fetchData();
+        setupSoCongFilter();
+        attachStaticListeners(); 
+        toggleFilterVisibility(); 
+    
+        // Initialize Flatpickr date pickers
+        // base.html đã tải flatpickr, chỉ cần gọi
+        generateSkeletonRows(10); // Tạo 10 dòng skeleton ban đầu
+        flatpickr("#filter-date", {
+            dateFormat: "d/m/Y",
+            allowInput: true,
+            locale: "vn" // Sử dụng ngôn ngữ Tiếng Việt đã tải từ base.html
+        });
+        if (isAdminOrBoss) {
+            flatpickr("#absence-check-date", {
+                dateFormat: "d/m/Y",
+                allowInput: true,
+                locale: "vn"
+            });
+            flatpickr("#modal-thoi-gian", { 
+                enableTime: true, 
+                dateFormat: "d/m/Y H:i", 
+                time_24hr: true, 
+                allowInput: true,
+                locale: "vn"
+            });
+        }
+    });
+</script>
+<script>
+    // --- LOGIC HIỂN THỊ THÔNG BÁO (TOAST) MỚI ---
+    // Hàm này sẽ "mở khóa" AudioContext của trình duyệt bằng cách phát một âm thanh câm
+    // khi người dùng tương tác lần đầu tiên. Sau đó, các âm thanh khác có thể phát tự do.
+    (function() {
+      let audioUnlocked = false;
+      const unlockAudio = () => {
+        if (audioUnlocked) return;
+        const audio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+        audio.play().then(() => { audioUnlocked = true; }).catch(() => {});
+        document.body.removeEventListener('click', unlockAudio);
+      };
+      document.body.addEventListener('click', unlockAudio, { once: true });
+    })();
+
+    function showToast(action, customMessage = '') {
+      const toastMap = {
+        add: { title: "Thêm thành công", message: "Bản ghi mới đã được tạo.", bg: "#10b981", sound: "/static/sounds/Add.mp3",
+          icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-green-500/10 animate-bounce-in"><svg class="w-5 h-5 text-green-700 dark:text-green-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></div>`
+        },
+        update: { title: "Cập nhật thành công", message: "Thông tin bản ghi đã được chỉnh sửa.", bg: "#3b82f6", sound: "/static/sounds/Update.mp3",
+          icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500/10 animate-scale-fade"><svg class="w-5 h-5 text-blue-700 dark:text-blue-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></div>`
+        },
+        delete: { title: "Đã xoá", message: "Mục đã bị xoá khỏi danh sách.", bg: "#ef4444", sound: "/static/sounds/Delete.mp3",
+          icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/10 animate-shake"><svg class="w-5 h-5 text-red-700 dark:text-red-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg></div>`
+        },
+        success: { title: "Thành công", message: "Yêu cầu đã được xử lý.", bg: "#0ea5e9", sound: "/static/sounds/Complete.mp3",
+          icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-sky-500/10 animate-rotate-in"><svg class="w-5 h-5 text-sky-700 dark:text-sky-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div>`
+        },
+      };
+      const config = toastMap[action] || toastMap.success;
+      let toastContainer = document.getElementById('toast-container');
+      if (!toastContainer) {
+          toastContainer = document.createElement("div");
+          toastContainer.id = 'toast-container';
+          toastContainer.className = "fixed top-6 right-6 z-[99999] flex flex-col gap-3";
+          document.body.appendChild(toastContainer);
+      }
+      const toast = document.createElement("div");
+      toast.className = `group relative overflow-hidden transition-all shadow-xl border border-gray-200 dark:border-gray-700 rounded-xl px-5 py-4 w-[300px] bg-white dark:bg-[#1f2937] backdrop-blur-md animate-toastIn`;
+      toast.innerHTML = `
+        <div class="flex items-start gap-3">
+          <div class="mt-1">${config.icon}</div>
+          <div class="flex-1">
+            <div class="text-sm font-semibold text-gray-800 dark:text-white">${config.title}</div>
+            <div class="text-xs text-gray-600 dark:text-gray-300 mt-0.5">${customMessage || config.message}</div>
+          </div>
+        </div>
+        <div class="progress-bar absolute bottom-0 left-0 h-[3px] bg-opacity-80"
+            style="background-color: ${config.bg}; width: 100%; transition: none;"></div>`;
+      toastContainer.appendChild(toast);
+
+      if (config.sound) {
+        const audio = new Audio(config.sound);
+        audio.volume = 0.6;
+        audio.play().catch(err => { console.warn("⚠️ Không phát được âm thanh:", err.message); });
+      }
+
+      let duration = 3500, elapsed = 0, last = performance.now();
+      const progress = toast.querySelector('.progress-bar');
+      const updateProgress = (now) => {
+        if (!toast._paused) elapsed += now - last;
+        last = now;
+        const percent = Math.max(0, 1 - elapsed / duration);
+        progress.style.width = `${percent * 100}%`;
+        if (elapsed < duration) { toast._rafId = requestAnimationFrame(updateProgress); } 
+        else {
+          toast.classList.add("opacity-0", "translate-x-6");
+          toast.style.transition = "all 0.4s ease-in-out";
+          setTimeout(() => toast.remove(), 400);
+        }
+      };
+      toast._paused = false;
+      toast._rafId = requestAnimationFrame(updateProgress);
+      toast.addEventListener("mouseenter", () => toast._paused = true);
+      toast.addEventListener("mouseleave", () => {
+        if (toast._rafId) cancelAnimationFrame(toast._rafId);
+        toast._paused = false; last = performance.now();
+        toast._rafId = requestAnimationFrame(updateProgress);
+      });
+    }
+</script>
+<script>
+    // Script tự động đăng xuất
+    function checkAndLogoutForShiftChange() {
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+
+        // Tự động đăng xuất lúc 6:59 sáng
+        const isMorningLogout = (hours === 6 && minutes === 59); 
+
+        // Tự động đăng xuất lúc 18:59 tối
+        const isEveningLogout = (hours === 18 && minutes === 59); 
+
+        if (isMorningLogout || isEveningLogout) {
+            console.log("Đã đến giờ chuyển ca, tự động đăng xuất...");
+            window.location.href = '/logout';
+        }
+    }
+
+    setInterval(checkAndLogoutForShiftChange, 30000);
+</script>
+{% endblock %}

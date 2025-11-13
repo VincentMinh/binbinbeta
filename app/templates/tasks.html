@@ -1,0 +1,1866 @@
+{% extends "base.html" %}
+
+{% set active_page = active_page or 'tasks' %}
+{% block title %}Quản lý công việc{% endblock %}
+
+{# 2. Đặt tiêu đề cho trang (kế thừa từ block 'page_title' trong base.html) #}
+{% block page_title %}Quản lý công việc{% endblock %}
+
+{# 3. Bắt đầu khối nội dung chính của trang #}
+{% block content %}
+
+<!-- Bọc toàn bộ nội dung trong một div để có padding nhất quán -->
+<div class="p-4 sm:p-6 lg:p-8">
+    {# 
+      PHẦN A: TÀI NGUYÊN CSS & STYLES CỤ THỂ CHO TRANG NÀY
+      (base.html đã tải Tailwind, Flatpickr. Chúng ta chỉ cần tải FullCalendar)
+    #}
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+    <style>
+      /* Responsive */
+      @media (max-width: 640px) {
+        .datepicker, select, input {
+          font-size: 14px; /* Giảm font size nếu cần thiết */
+          padding: 12px;  /* Tăng padding để tạo khoảng cách hợp lý */
+        }
+      }
+      @media (max-height: 500px) {
+        #editModal form {
+          max-height: 90vh;
+          overflow-y: auto;
+          padding-bottom: 5rem;
+        }
+      }
+
+      /* Chuyển động */
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes bounceIn {
+        0% { transform: scale(0.7); opacity: 0; }
+        60% { transform: scale(1.1); opacity: 1; }
+        100% { transform: scale(1); }
+      }
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        20%, 60% { transform: translateX(-4px); }
+        40%, 80% { transform: translateX(4px); }
+      }
+      @keyframes toastIn {
+        from { opacity: 0; transform: translateX(20px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      .animate-fadeIn { animation: fadeIn 0.35s ease-out; }
+      .animate-bounce-in { animation: bounceIn 0.4s ease-out both; }
+      .animate-shake { animation: shake 0.45s ease-in-out both; }
+      .animate-toastIn { animation: toastIn 0.5s ease-out; }
+
+      /* Cải thiện nền (Nếu cần ghi đè) */
+      /* Lưu ý: base.html đã định nghĩa body.
+        Các style này có thể không cần thiết nữa hoặc cần điều chỉnh.
+        Tôi tạm giữ lại các style cho .btn, .table, .modal-content
+        vì chúng đặc thù cho trang này.
+      */
+
+      /* Các thành phần tương tác */
+      .btn-edit, .btn-complete, .btn-delete, .btn-close {
+        transition: all 0.3s ease; border-radius: 10px; padding: 12px;
+        font-weight: 600; font-size: 15px; color: white; display: inline-block;
+      }
+      .btn-edit { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+      .btn-complete { background: linear-gradient(135deg, #4caf50, #388e3c); }
+      .btn-delete { background: linear-gradient(135deg, #ef4444, #dc2626); }
+      .btn-close { background: linear-gradient(135deg, #6b7280, #4b5563); }
+      .btn-edit:hover, .btn-complete:hover, .btn-delete:hover, .btn-close:hover {
+        transform: scale(1.05); box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+      }
+
+      /* Cải thiện bảng và modal */
+      .table, .card {
+        background-color: #242b3b; border-radius: 12px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+      }
+      .modal-content {
+        background: rgba(30, 30, 45, 0.8); padding: 20px;
+        border-radius: 20px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        word-break: break-word; overflow-wrap: break-word;
+      }
+      
+      /* [XÓA BỎ] Đã loại bỏ rule CSS này vì chúng ta đã sửa HTML
+        .max-w-6xl.mx-auto.w-full.mb-10 {
+          margin-bottom: 0.5rem;
+        }
+      */
+      .table-fixed {
+        margin-top: 1rem;
+      }
+      
+      /* CSS cho FullCalendar */
+      #miniFullCalendar .fc-header-toolbar,
+      #miniFullCalendar .fc-toolbar-title,
+      #miniFullCalendar .fc-button-group,
+      #miniFullCalendar .fc-button,
+      #miniFullCalendar .fc-today-button { display: none !important; }
+      #calendarModal { overflow: hidden; }
+      #fullCalendar { width: 100% !important; height: auto !important; min-height: 400px; }
+      
+      .fc-toolbar-title { text-transform: uppercase; }
+      .fc-daygrid-day-frame {
+        border: 1px solid rgba(0, 0, 0, 0.05); border-radius: 6px;
+        overflow: hidden; transition: background 0.2s, border 0.2s;
+      }
+      .fc-daygrid-day:hover .fc-daygrid-day-frame {
+        background-color: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3);
+      }
+      .fc-daygrid-day-number {
+        display: flex; justify-content: center; align-items: center;
+        height: 24px; width: 24px; margin: 4px auto;
+        font-weight: 500; border-radius: 50%; transition: background 0.2s, color 0.2s;
+      }
+      .fc-day-today .fc-daygrid-day-number { background-color: #3b82f6; color: white; }
+
+      /* CSS cho scrollbar và pagination */
+      .scrollbar-thin::-webkit-scrollbar { height: 8px; width: 8px; }
+      .scrollbar-thin::-webkit-scrollbar-thumb {
+        background-color: rgba(156, 163, 175, 0.6); border-radius: 6px;
+      }
+      .pagination a, .pagination span { transition: all 0.2s ease-in-out; }
+      .pagination a:hover {
+        background-color: rgba(59, 130, 246, 0.1); color: #2563eb; border-color: #2563eb;
+      }
+      /* CSS cho cột sắp xếp */
+      .sortable {
+          cursor: pointer;
+          user-select: none;
+          position: relative;
+      }
+      .sortable .sort-indicator {
+          position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+          opacity: 0.5; font-size: 0.8em; color: #6b7280; line-height: 1;
+      }
+      .sortable.asc .sort-indicator, .sortable.desc .sort-indicator {
+          opacity: 1; color: #2563eb;
+      }
+      .sortable:hover .sort-indicator { opacity: 0.8; }
+    </style>
+    {# 
+      PHẦN A.1: CSS FIX CHO DARK MODE FULLCALENDAR
+      Thêm các quy tắc này để đảm bảo header của chế độ xem danh sách (listWeek)
+      hiển thị đúng trong chế độ tối.
+    #}
+    <style>
+      .dark .fc-list-day-cushion {
+        background-color: #1f2937 !important; /* bg-slate-800 */
+      }
+      /* SỬA LỖI: Thay đổi màu nền khi hover vào mục trong chế độ xem Danh sách (dark mode).
+         FullCalendar sử dụng class .fc-event-highlight thay vì pseudo-class :hover.
+      */
+      .dark .fc-list-event.fc-event-highlight {
+        background-color: #334155 !important; /* bg-slate-700 */
+      }
+      /* 
+        SỬA LỖI: Ghi đè màu chữ và màu nền khi hover trong chế độ xem danh sách (dark mode).
+        Quy tắc này đảm bảo rằng khi một hàng được highlight, cả nền và chữ đều có màu phù hợp.
+      */
+      .dark .fc-list-event.fc-event-highlight td {
+          background-color: #334155 !important; /* bg-slate-700 */
+      }
+    </style>
+    {# 
+      PHẦN B: NỘI DUNG HTML CỦA TRANG
+      [THAY ĐỔI] Đã loại bỏ các class 'max-w-6xl' và 'mx-auto'
+      khỏi các div bọc chính để nội dung lấp đầy khu vực <main> của base.html.
+    #}
+
+    <div id="dashboardSection" class="w-full mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div class="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-4">
+          <h2 class="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-100 text-center">Tổng quan</h2>
+          <div class="grid grid-cols-2 gap-4">
+            {% set status_map = {
+              "Tổng công việc": "",
+              "Hoàn thành": "Hoàn thành",
+              "Đang chờ": "Đang chờ",
+              "Quá hạn": "Quá hạn"
+            } %}
+            {% for label, color, value in [
+              ("Tổng công việc", "text-blue-500", thong_ke.tong_cong_viec),
+              ("Hoàn thành", "text-green-500", thong_ke.hoan_thanh),
+              ("Đang chờ", "text-yellow-500", thong_ke.dang_cho),
+              ("Quá hạn", "text-red-500", thong_ke.qua_han)
+            ] %}
+              {% set status = status_map[label] %}
+              <a href="/tasks?trang_thai={{ status | urlencode }}"
+                class="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:shadow-md transition-all duration-300 ease-out hover:scale-[1.03]">
+                <div class="text-2xl font-bold {{ color }}" data-countup="{{ value }}">0</div> <div class="text-sm text-gray-600 dark:text-gray-300 mt-2">{{ label }}</div>
+              </a>
+            {% endfor %}
+          </div>
+        </div>
+
+      <div class="hidden sm:flex bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col justify-between min-h-[260px] cursor-pointer hover:scale-[1.03] hover:shadow-md transition-all duration-300"
+            onclick="openModal('calendarModal')">
+            <h2 class="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-100 text-center">Lịch công việc</h2>
+            <div class="flex-1 flex items-center justify-center w-full text-blue-600 dark:text-blue-400">
+                <svg class="w-[100px] h-[100px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M15 4V2m0 2v2m0-2h-4.5M3 10v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-9H3Z" />
+                  <path d="M3 10V6a2 2 0 0 1 2-2h2M7 2v4M21 8v2" />
+                </svg>
+            </div>
+        </div>
+
+        <div class="hidden sm:flex bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 flex flex-col justify-between min-h-[260px]">
+          <h2 class="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-100 text-center">Theo trạng thái</h2>
+          <div class="flex-1 flex items-center justify-center">
+            <canvas id="barChart" class="w-full h-[180px]"></canvas>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    {# 
+      [THAY ĐỔI] Đã loại bỏ 'max-w-6xl', 'mx-auto' và 'w-full'.
+      Đồng thời, thay 'mb-10' bằng 'mb-2' để khớp với ý định trong CSS của bạn (0.5rem)
+      mà không cần ghi đè CSS.
+    #}
+    <div class="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm mb-6">
+        <div class="p-4">
+        <form id="filterForm" method="get" action="/tasks" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <!-- 1. Chi nhánh -->
+                {% if user.role != 'letan' %}
+                <div>
+                    <select name="chi_nhanh" onchange="this.form.submit()" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <option value="">Tất cả chi nhánh</option>
+                        {% for cn in branches %}{% if cn|lower not in ['admin', 'boss'] %}<option value="{{ cn }}" {% if chi_nhanh == cn %}selected{% endif %}>{{ cn }}</option>{% endif %}{% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <input type="hidden" name="chi_nhanh" value="{{ user_chi_nhanh }}">
+                {% endif %}
+
+                <!-- 2. Trạng thái -->
+                <div>
+                    <select name="trang_thai" onchange="this.form.submit()" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="Đang chờ" {% if trang_thai == 'Đang chờ' %}selected{% endif %}>Đang chờ</option>
+                        <option value="Hoàn thành" {% if trang_thai == 'Hoàn thành' %}selected{% endif %}>Hoàn thành</option>
+                        <option value="Quá hạn" {% if trang_thai == 'Quá hạn' %}selected{% endif %}>Quá hạn</option>
+                        {% if user.role in ['quanly', 'admin', 'boss'] %}
+                        <option value="Đã xoá" {% if trang_thai == 'Đã xoá' %}selected{% endif %}>Đã xoá</option>
+                        {% endif %}
+                    </select>
+                </div>
+
+                <!-- 3. Bộ phận -->
+                <div>
+                    <select name="bo_phan" onchange="this.form.submit()" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <option value="">Tất cả bộ phận</option>
+                        {% for bp in departments %}<option value="{{ bp }}" {% if bo_phan == bp %}selected{% endif %}>{{ bp }}</option>{% endfor %}
+                    </select>
+                </div>
+
+                <!-- 4. Hạn hoàn thành -->
+                <div>
+                    <input type="text" name="han_hoan_thanh" value="{{ han_hoan_thanh or '' }}" placeholder="Chọn hạn hoàn thành..." class="datepicker w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                </div>
+
+                <!-- 5. Ô tìm kiếm -->
+                <div class="relative {% if user.role == 'letan' %}lg:col-span-2{% endif %}">
+                    <input name="search" value="{{ search or '' }}" placeholder="Tìm theo phòng, mô tả, người tạo..." class="w-full pl-4 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                </div>
+            </div>
+            <div class="flex flex-wrap justify-between items-center gap-4 pt-2">
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-md flex items-center gap-2 font-semibold transition text-sm">Áp dụng</button>
+                    <a href="/tasks" class="bg-slate-200 hover:bg-slate-300 dark:bg-slate-600 dark:hover:bg-slate-500 text-slate-800 dark:text-slate-100 px-5 py-2 rounded-lg flex items-center gap-2 font-medium transition text-sm">Xóa bộ lọc</a>
+                </div>
+                <div class="flex items-center gap-3">
+                    {% if user.role in ['admin', 'boss'] %}
+                    <button type="button" id="export-excel-btn" class="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-cyan-600 hover:to-teal-600 text-white px-5 py-2 rounded-lg shadow-md flex items-center gap-2 font-semibold transition text-sm">Xuất Excel</button>
+                    {% endif %}
+                    <button type="button" onclick="openModal('addTaskModal')" class="bg-gradient-to-r from-green-500 to-blue-500 hover:from-blue-600 hover:to-green-600 text-white px-5 py-2 rounded-lg shadow-md flex items-center gap-2 font-semibold transition text-sm">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>
+                        <span>Thêm mới</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+        </div>
+    </div>
+
+    {# [KHÔNG ĐỔI] Div này đã full-width, nó sẽ tự động dãn ra. #}
+    <div class="mb-4 flex flex-col sm:flex-row justify-between items-center gap-4 transition-all duration-300">
+      <div class="flex items-center gap-4">
+          {% if user.role in ['quanly', 'admin', 'boss'] or (user.role == 'letan' and user_chi_nhanh) %}
+          <button id="delete-selected-btn" class="hidden px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition font-semibold text-sm flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 01-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0111 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+              Xóa mục đã chọn
+          </button>
+          {% endif %}
+          <div class="flex items-center gap-2 ml-4">
+              <label for="per-page-select" class="text-sm font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">Hiển thị:</label>
+              <select id="per-page-select" class="block rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 pl-3 pr-8 text-sm">
+                  <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                  <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                  <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+              </select>
+          </div>
+          <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            {% if total_tasks > 0 %}Hiển thị {{ tasks|length }} / {{ total_tasks }} công việc.{% endif %}
+          </p>
+      </div>
+
+      <div class="w-full sm:w-auto flex justify-center items-center mt-4 sm:mt-0 sm:mr-4">
+        {% if total_pages > 1 %}
+          <div class="pagination flex flex-wrap justify-center gap-1 text-sm text-gray-700 dark:text-gray-300">
+            {% if page > 1 %}
+              <a href="/tasks?page=1{{ query_string|safe }}" class="px-3 py-1 border rounded-full hover:bg-blue-100 dark:hover:bg-gray-700 transition">«</a>
+              <a href="/tasks?page={{ page - 1 }}{{ query_string|safe }}" class="px-3 py-1 border rounded-full hover:bg-blue-100 dark:hover:bg-gray-700 transition">‹</a>
+            {% endif %}
+
+            {% for p in range(1, total_pages + 1) %}
+              {% if p == page %}
+                <span class="px-3 py-1 rounded-full bg-blue-600 text-white font-semibold shadow">{{ p }}</span>
+              {% elif p >= page - 2 and p <= page + 2 %}
+                <a href="/tasks?page={{ p }}{{ query_string|safe }}" class="px-3 py-1 border rounded-full hover:bg-blue-100 dark:hover:bg-gray-700 transition">{{ p }}</a>
+              {% elif p == 1 or p == total_pages %}
+                <span class="px-2 text-gray-400">...</span>
+              {% endif %}
+            {% endfor %}
+            {% if page < total_pages %}
+              <a href="/tasks?page={{ page + 1 }}{{ query_string|safe }}" class="px-3 py-1 border rounded-full hover:bg-blue-100 dark:hover:bg-gray-700 transition">›</a>
+              <a href="/tasks?page={{ total_pages }}{{ query_string|safe }}" class="px-3 py-1 border rounded-full hover:bg-blue-100 dark:hover:bg-gray-700 transition">»</a>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# 
+      [THAY ĐỔI] Đã loại bỏ div bọc: <div class="flex justify-center px-2">
+      Điều này cho phép card bảng dãn ra lấp đầy 100% chiều rộng của <main>.
+    #}
+    <div class="w-full bg-white dark:bg-slate-900/70 overflow-hidden rounded-2xl shadow-md border border-slate-200 dark:border-slate-800 transition-all duration-300 {% if total_pages <= 1 %}mb-4{% else %}mb-6{% endif %} hidden lg:block">
+      <div class="overflow-auto max-h-[65vh]">
+        <table class="w-full text-sm text-left text-slate-500 dark:text-slate-400 border-collapse">
+          <thead class="sticky top-0 z-10 text-xs text-slate-700 uppercase dark:text-slate-400 bg-gradient-to-b from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-700 border-b border-slate-200 dark:border-slate-700">
+            <tr>
+              {% if user.role in ['quanly', 'admin', 'boss'] or (user.role == 'letan' and user_chi_nhanh) %}
+              <th scope="col" class="w-12 px-4 py-3 text-center rounded-tl-2xl">
+                <input type="checkbox" id="select-all-checkbox" class="h-4 w-4 rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 bg-white dark:bg-slate-700">
+              </th>
+              {% endif %}
+              <th scope="col" class="w-24 px-4 py-3 text-left {% if user.role not in ['quanly', 'admin', 'boss'] and not (user.role == 'letan' and user_chi_nhanh) %}rounded-tl-2xl{% endif %}">ID</th>
+              <th scope="col" class="w-28 px-4 py-3 text-center">Vị trí</th>
+              <th scope="col" class="hidden lg:table-cell w-32 px-4 py-3 text-left">Bộ phận</th>
+              <th scope="col" class="px-4 py-3 text-center">Mô tả</th>
+              <th scope="col" class="hidden md:table-cell px-4 py-3 text-center">Ghi chú</th>
+              <th scope="col" class="w-32 px-4 py-3 text-center">Trạng thái</th>
+              <th scope="col" class="w-28 px-4 py-3 text-center rounded-tr-2xl">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tasks %}
+            {# Bỏ màu nền dòng, thêm border-b để tạo lưới #} {# Removed bg-slate-50 dark:bg-slate-800 from th elements #}
+            <tr onclick="handleRowClick(event, this)" data-task='{{ t | tojson | safe }}' data-row-id="{{ t.id }}" class="bg-white border-b dark:bg-slate-900 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors duration-150">
+              {% if user.role in ['quanly', 'admin', 'boss'] or (user.role == 'letan' and user_chi_nhanh) %}
+              <td class="px-4 py-3 text-center {% if loop.last %}rounded-bl-2xl{% endif %}">
+                <input type="checkbox" class="row-checkbox h-4 w-4 rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 bg-white dark:bg-slate-700 pointer-events-auto" data-id="{{ t.id }}">
+              </td>
+              {% endif %}
+              <td class="px-4 py-3 text-left font-mono text-xs whitespace-nowrap" title="{{ t.id_task }}">{{ t.id_task }}</td>
+              <td class="px-4 py-3 text-center break-words">{{ t.phong }}</td>
+              <td class="hidden lg:table-cell px-4 py-3 text-left whitespace-nowrap">{{ t.department }}</td>
+              <td class="px-4 py-3 text-center max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap" title="{{ t.mo_ta }}">{{ t.mo_ta }}</td>
+              <td class="hidden md:table-cell px-4 py-3 text-center max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap" title="{{ t.ghi_chu }}">{{ t.ghi_chu }}</td>
+              
+              <td class="px-4 py-3 text-center">
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold
+                  {% if t.trang_thai == 'Hoàn thành' %} bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300
+                  {% elif t.trang_thai == 'Quá hạn' %} bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300
+                  {% elif t.trang_thai == 'Đang chờ' %} bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300
+                  {% elif t.trang_thai == 'Đã xoá' %} bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-400
+                  {% endif %}">{{ t.trang_thai }}</span>
+              </td>
+              <td class="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-300 {% if loop.last %}rounded-br-2xl{% endif %}">
+                <div class="flex justify-center flex-wrap gap-1 max-w-[80px] mx-auto pointer-events-auto">
+                  {% if user.role in ['quanly', 'ktv', 'admin', 'boss', 'buongphong', 'baove'] or (user.role == 'letan' and t.chi_nhanh == user_chi_nhanh) %}
+                    {% if t.trang_thai not in ['Hoàn thành', 'Đã xoá'] %}
+                    <button title="Hoàn thành" 
+                            class="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 transition complete-btn-ajax" 
+                            data-task-id="{{ t.id }}"
+                            onclick="event.stopPropagation(); completeTask(this, '{{ user.name }}');">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </button>
+                    {% endif %}
+                  {% endif %}
+
+                  {% if user.role in ['quanly', 'ktv', 'admin', 'boss', 'buongphong', 'baove'] or (user.role == 'letan' and t.chi_nhanh == user_chi_nhanh) %}
+                    <button title="Sửa" class="text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300 transition" onclick="event.stopPropagation(); openEditModal(this)" data-task='{{ t | tojson | safe }}'>
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 11l6.232-6.232a2 2 0 112.828 2.828L11.828 13.828a2 2 0 01-1.414.586H7v-3a2 2 0 01.586-1.414z" />
+                      </svg>
+                    </button>
+                  {% endif %}
+
+                  {% if user.role in ['quanly', 'admin', 'boss'] or (user.role == 'letan' and t.chi_nhanh == user_chi_nhanh) %}
+                    <button title="Xoá" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition delete-btn-ajax" 
+                            data-task-id="{{ t.id }}"
+                            onclick="event.stopPropagation(); deleteTask(this);">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    {# 
+      [THAY ĐỔI] Đã loại bỏ 'px-2' (vì <main> đã có p-4),
+      'h-[calc(100vh-150px)]' và 'overflow-y-auto' (để <main> xử lý cuộn).
+    #}
+    <div class="block lg:hidden w-full scroll-smooth">
+      <div class="space-y-4"> {% if tasks %} {# Thêm padding bottom để không bị che bởi thanh điều hướng nếu có #}
+        {% for t in tasks %} {% set formatted_han_hoan_thanh = t.han_hoan_thanh %}
+        {% set formatted_han_hoan_thanh = t.han_hoan_thanh %}
+        {% if not formatted_han_hoan_thanh and t.han_hoan_thanh_raw %}
+          {% set date_parts = t.han_hoan_thanh_raw.split('T')[0].split('-') %}
+          {% if date_parts | length == 3 %}
+            {% set formatted_han_hoan_thanh = date_parts[2] ~ '/' ~ date_parts[1] ~ '/' ~ date_parts[0] %}
+          {% endif %}
+        {% endif %}
+
+        <div class="relative overflow-hidden rounded-2xl shadow-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 swipe-item" 
+            data-task-id="{{ t.id }}" 
+            data-task='{{ t | tojson | safe }}'>
+
+          <div class="p-4 flex flex-col gap-2">
+            <div class="flex justify-between items-center">
+              <div class="text-base font-semibold text-gray-800 dark:text-gray-100">{{ t.phong }}</div>
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold
+                {% if t.trang_thai == 'Hoàn thành' %} bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300
+                {% elif t.trang_thai == 'Quá hạn' %} bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300
+                {% elif t.trang_thai == 'Đang chờ' %} bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300
+                {% elif t.trang_thai == 'Đã xoá' %} bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-400
+                {% endif %}">{{ t.trang_thai }}</span>
+            </div>
+            <div class="text-sm text-gray-600 dark:text-gray-300">{{ t.mo_ta }}</div>
+            {% if t.ghi_chu %}
+            <div class="text-xs text-gray-400 italic">Ghi chú: {{ t.ghi_chu }}</div>
+            {% endif %}
+            {% if t.department %}
+            <div class="text-xs text-gray-500 dark:text-gray-400">Bộ phận: <span class="font-medium">{{ t.department }}</span></div>
+            {% endif %}
+            <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span class="font-mono text-left">{{ t.id_task }}</span>
+            </div>
+            {% if user.role == 'quanly' %}
+            <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+              {% if t.nguoi_thuc_hien %}<span>Thực hiện: {{ t.nguoi_thuc_hien }}</span>{% endif %}
+              {% if t.ngay_hoan_thanh %}<span>HT: {{ t.ngay_hoan_thanh }}</span>{% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-center py-16 text-slate-500 dark:text-slate-400">Không có công việc nào.</div>
+        {% endif %}
+      </div>
+    </div>
+    
+</div> <!-- Đóng div padding chung -->
+
+    {# 
+      PHẦN C: CÁC MODALS CỦA TRANG
+      (Đặt ở cuối block content)
+    #}
+
+    <div id="addTaskModal" class="modal fixed inset-0 z-[9998] bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4" onclick="closeModal('addTaskModal')">
+        <div onclick="event.stopPropagation()" class="relative w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col animate-fadeIn">
+            <div class="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+                <div class="flex items-center gap-3">
+                    <div class="grid place-items-center w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50">
+                        <svg class="w-5 h-5 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+                    </div>
+                    <h2 class="text-lg font-semibold text-slate-800 dark:text-white">Thêm công việc mới</h2>
+                </div>
+                <button onclick="closeModal('addTaskModal')" class="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            <form method="post" action="/add" id="addTaskForm" class="p-5 space-y-4 overflow-y-auto">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {% if user.role in ['quanly', 'ktv', 'admin', 'boss'] %}
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Chi nhánh</label>
+                        <select name="chi_nhanh" required class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            <option value="" disabled selected>Chọn chi nhánh</option>
+                            {% for cn in branches %}{% if cn|lower not in ['admin', 'boss'] %}<option value="{{ cn }}" {% if chi_nhanh == cn %}selected{% endif %}>{{ cn }}</option>{% endif %}{% endfor %}
+                        </select>
+                    </div>
+                    {% else %}
+                        <input type="hidden" name="chi_nhanh" value="{{ user_chi_nhanh }}">
+                    {% endif %}
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Vị trí</label>
+                        <input type="text" name="phong" placeholder="Vị trí" required class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Mô tả công việc</label>
+                        <input type="text" name="mo_ta" placeholder="Mô tả công việc" required class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Hạn hoàn thành</label>
+                        <input type="text" name="han_hoan_thanh" required class="datepicker w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="Chọn ngày..." />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Bộ phận</label>
+                        <select name="bo_phan" required class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            <option value="" disabled selected>Chọn bộ phận</option>
+                            {% for bp in departments %}<option value="{{ bp }}">{{ bp }}</option>{% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Ghi chú</label>
+                    <textarea name="ghi_chu" placeholder="Ghi chú (nếu có)" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" rows="2"></textarea>
+                </div>
+                <input type="hidden" name="nguoi_tao" value="{{ user }}">
+            </form>
+            <div class="p-5 border-t border-slate-200 dark:border-slate-700 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                <button type="button" onclick="closeModal('addTaskModal')" class="px-5 py-2.5 text-center text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">Hủy</button>
+                <button type="submit" form="addTaskForm" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-lg shadow-blue-500/20">Thêm công việc</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editModal" class="modal fixed inset-0 z-[9999] bg-black/40 backdrop-blur-sm hidden flex items-center justify-center p-4" onclick="closeModal('editModal')">
+      <div onclick="event.stopPropagation()" class="relative w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col animate-fadeIn">
+        <div class="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+            <div class="flex items-center gap-3">
+                <div class="grid place-items-center w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50">
+                    <svg class="w-5 h-5 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                </div>
+                <h2 class="text-lg font-semibold text-slate-800 dark:text-white">Sửa công việc</h2>
+            </div>
+            <button onclick="closeModal('editModal')" class="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+
+        <form id="editForm" class="p-5 space-y-4 overflow-y-auto">
+            <input type="hidden" name="task_id" id="edit_task_id">
+            <input type="hidden" name="redirect_query" value="{{ query_string }}">
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {% if user.role in ['quanly', 'admin', 'boss'] %}
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Chi nhánh</label>
+                    <select name="chi_nhanh" id="edit_chi_nhanh" required class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <option value="" disabled selected>Chọn chi nhánh</option>
+                        {% for cn in branches %}{% if cn|lower not in ['admin', 'boss'] %}<option value="{{ cn }}" {% if chi_nhanh == cn %}selected{% endif %}>{{ cn }}</option>{% endif %}{% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <input type="hidden" name="chi_nhanh" id="edit_chi_nhanh" value="{{ active_branch }}">
+                {% endif %}
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Vị trí</label>
+                    <input type="text" name="phong" id="edit_phong" placeholder="VD: P.203, Lobby..." required class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Mô tả</label>
+                    <input type="text" name="mo_ta" id="edit_mo_ta" placeholder="VD: Vệ sinh máy lạnh" required class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Bộ phận</label>
+                    <select name="bo_phan" id="edit_bo_phan" required class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <option value="" disabled selected>Chọn bộ phận</option>
+                        {% for bp in departments %}<option value="{{ bp }}">{{ bp }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Hạn hoàn thành</label>
+                    <input type="text" name="han_hoan_thanh" id="edit_han_hoan_thanh" placeholder="Chọn ngày..." class="datepicker w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Ghi chú</label>
+                    <textarea name="ghi_chu" id="edit_ghi_chu" rows="3" placeholder="Thông tin bổ sung..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></textarea>
+                </div>
+            </div>
+        </form>
+        <div class="p-5 border-t border-slate-200 dark:border-slate-700 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+            <button type="button" onclick="closeModal('editModal')" class="px-5 py-2.5 text-center text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">Hủy</button>
+            <button type="submit" form="editForm" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-lg shadow-blue-500/20">Cập nhật</button>
+          </div>
+      </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- ============ PANEL CHI TIẾT CÔNG VIỆC (THIẾT KẾ MỚI) ============ -->
+    <!-- ================================================================== -->
+    <div id="taskDetailPanel" class="modal fixed inset-0 z-[10000] hidden flex items-center justify-center p-4" aria-labelledby="modal-title" role="dialog" aria-modal="true" onclick="closeTaskDetailModal()">
+      <div id="taskDetailBackdrop" class="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ease-in-out opacity-0"></div>
+      
+      <div id="taskDetailPanelContent" onclick="event.stopPropagation()" class="relative w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col transition-all duration-300 ease-in-out opacity-0 scale-95 z-10">
+        
+        <!-- Header -->
+        <div id="panelHeader" class="flex items-start justify-between p-5 border-b border-slate-200 dark:border-slate-700 transition-colors duration-300">
+          <div class="flex items-center gap-4">
+            <div id="taskIconContainer" class="grid place-items-center w-12 h-12 rounded-xl transition-colors duration-300">
+              <svg id="taskIcon" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"></svg>
+            </div>
+            <div>
+              <h2 id="taskDetailViTri" class="text-xl font-bold text-slate-800 dark:text-white"></h2>
+              <div class="mt-1.5">
+                <p id="taskDetailIdTask" class="inline-block rounded-md bg-slate-100 dark:bg-slate-700 px-2 py-0.5 text-sm font-mono text-slate-700 dark:text-slate-200"></p>
+              </div>
+            </div>
+          </div>
+          <button type="button" onclick="closeTaskDetailModal()" class="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <!-- Content -->
+        <div class="p-5 space-y-6 overflow-y-auto">
+
+          <!-- Main Info -->
+          <div class="space-y-3">
+            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700">
+              <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Mô tả công việc</p>
+              <p id="taskDetailMoTa" class="mt-1 text-base text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words"></p>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700">
+              <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Ghi chú</p>
+              <p id="taskDetailGhiChu" class="mt-1 text-base text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words"></p>
+            </div>
+          </div>
+
+          <!-- Details Grid -->
+          <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+            <div><dt class="font-medium text-slate-500 dark:text-slate-400">Ngày tạo</dt><dd id="taskDetailNgayTao" class="mt-1 text-slate-800 dark:text-slate-200"></dd></div>
+            <div><dt class="font-medium text-slate-500 dark:text-slate-400">Hạn hoàn thành</dt><dd id="taskDetailHanHoanThanh" class="mt-1 text-slate-800 dark:text-slate-200"></dd></div>
+            <div><dt class="font-medium text-slate-500 dark:text-slate-400">Người tạo</dt><dd id="taskDetailNguoiLap" class="mt-1 text-slate-800 dark:text-slate-200"></dd></div>
+            <div><dt class="font-medium text-slate-500 dark:text-slate-400">Bộ phận</dt><dd id="taskDetailBoPhan" class="mt-1 text-slate-800 dark:text-slate-200"></dd></div>
+          </dl>
+
+          <!-- History Section -->
+          <div id="taskHistorySection" class="hidden pt-4 border-t border-slate-200 dark:border-slate-700 space-y-4">
+            <div id="completedInfo" class="hidden p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800">
+              <h4 class="font-semibold text-emerald-800 dark:text-emerald-200 mb-2">Thông tin hoàn thành</h4>
+              <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                <div><dt class="font-medium text-emerald-700 dark:text-emerald-300">Người thực hiện</dt><dd id="taskDetailNguoiHoanThanh" class="mt-1"></dd></div>
+                <div><dt class="font-medium text-emerald-700 dark:text-emerald-300">Ngày hoàn thành</dt><dd id="taskDetailNgayHoanThanh" class="mt-1"></dd></div>
+              </dl>
+            </div>
+            <div id="deletedInfo" class="hidden p-4 rounded-xl bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800">
+              <h4 class="font-semibold text-rose-800 dark:text-rose-200 mb-2">Thông tin xóa</h4>
+              <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                <div><dt class="font-medium text-rose-700 dark:text-rose-300">Người xóa</dt><dd id="taskDetailNguoiXoa" class="mt-1"></dd></div>
+                <div><dt class="font-medium text-rose-700 dark:text-rose-300">Ngày xóa</dt><dd id="taskDetailNgayXoa" class="mt-1"></dd></div>
+              </dl>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="p-5 border-t border-slate-200 dark:border-slate-700 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+          <button id="btn-delete" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-white bg-rose-600 rounded-xl hover:bg-rose-700 active:bg-rose-800 transition-colors shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2 {% if user.role == 'ktv' %}hidden{% endif %}">
+            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+            <span>Xóa</span>
+          </button>
+          <button id="btn-edit" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">Sửa</button>
+          <button id="btn-complete" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-white bg-green-600 rounded-xl hover:bg-green-700 active:bg-green-800 transition-colors shadow-lg shadow-green-500/20">Đánh dấu hoàn thành</button>
+        </div>
+      </div>
+    </div>
+    
+    <div
+      id="calendarModal"
+      class="fixed inset-0 z-[9998] bg-black/50 hidden flex items-center justify-center p-4 overflow-hidden"
+      onclick="closeModal('calendarModal')"
+    >
+      <div
+        onclick="event.stopPropagation()"
+        class="relative w-full max-w-[95vw] sm:max-w-2xl lg:max-w-4xl bg-white/30 dark:bg-gradient-to-br dark:from-[#1e1e2b] dark:to-[#25273c] rounded-2xl shadow-xl backdrop-blur-lg max-h-[90dvh] flex flex-col overflow-y-auto transition-all animate-fadeIn"
+      >
+        <div class="flex items-center justify-between p-4 border-b border-gray-300 dark:border-gray-700">
+          <div class="flex items-center gap-3">
+            <i class="iconoir-calendar text-[40px] text-gray-700"></i>
+            <h2 class="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
+              Lịch công việc
+            </h2>
+          </div>
+          <button
+            onclick="closeModal('calendarModal')"
+            class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+            title="Đóng"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-800 dark:text-gray-100" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div id="calendarDetailContent" class="flex-1 w-full h-full p-2">
+          <div id="fullCalendar" class="w-full h-full"></div>
+        </div>
+      </div>
+    </div>
+
+{% endblock %}
+{# 3. Kết thúc khối nội dung chính #}
+
+
+{# 4. Bắt đầu khối scripts (sẽ được chèn vào cuối <body> của base.html) #}
+{% block scripts %}
+
+    {# 
+      PHẦN D: TÀI NGUYÊN JAVASCRIPT CỤ THỂ CHO TRANG NÀY
+      (base.html đã tải Alpine, Flatpickr. Chúng ta tải SweetAlert, Chart, FullCalendar)
+    #}
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+
+    {# 
+      PHẦN E: TẤT CẢ LOGIC JAVASCRIPT INLINE CỦA TRANG
+    #}
+    
+    <script>
+      const USER_ROLE = "{{ user.role }}";
+      const USER_NAME = "{{ user.name }}";
+      const USER_CHI_NHANH = "{{ user_chi_nhanh }}";
+      
+      document.querySelectorAll('.swipe-item').forEach(item => {
+          let startX = 0;
+          let currentX = 0;
+          let isDragging = false;
+          const statusSpan = item.querySelector('span');
+
+          item.addEventListener('touchstart', (e) => {
+              startX = e.touches[0].clientX;
+              isDragging = true;
+              item.style.transition = 'none';
+          });
+
+          item.addEventListener('touchmove', (e) => {
+              if (!isDragging) return;
+              currentX = e.touches[0].clientX - startX;
+              const currentStatus = statusSpan.textContent.trim();
+              if (USER_ROLE === 'ktv') {
+                  if (currentStatus === 'Hoàn thành' || currentStatus === 'Đã xoá') { currentX = 0; } 
+                  else { if (currentX > 0) { currentX = 0; } }
+              }
+              if (USER_ROLE !== 'ktv' && !(USER_ROLE === 'letan' && item.dataset.task && JSON.parse(item.dataset.task).chi_nhanh === USER_BRANCH)) { // Letan can delete their own branch tasks
+                  if (currentStatus === 'Hoàn thành' && currentX < 0) { currentX = 0; }
+                  if (currentStatus === 'Đã xoá' && currentX < 0) { currentX = 0; }
+              }
+              if (currentX < 120 && currentX > -120) {
+                  item.style.transform = `translateX(${currentX}px)`;
+                  const swipePercent = Math.min(Math.abs(currentX) / 120, 1);
+                  item.style.backgroundColor = currentX < 0
+                      ? `rgba(34,197,94,${swipePercent})`  // Green
+                      : `rgba(239,68,68,${swipePercent})`; // Red
+              }
+          });
+
+          item.addEventListener('touchend', async () => {
+              item.style.transition = 'transform 0.3s ease, background-color 0.3s ease';
+              const taskId = item.getAttribute('data-task-id');
+              const currentStatus = statusSpan.textContent.trim();
+
+              // Vuốt Trái -> Hoàn thành
+              if (currentX < -120) {
+                  if (USER_ROLE === 'ktv') {
+                      if ((currentStatus === 'Đang chờ' || currentStatus === 'Quá hạn' || currentStatus === 'Đã xoá') && confirm('Bạn có chắc chắn muốn đánh dấu hoàn thành công việc này?')) { // KTV can complete deleted tasks
+                          const res = await fetch(`/complete/${taskId}?json=1`, {
+                              method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                              body: `nguoi_thuc_hien={{ user }}`
+                          });
+                          const result = await res.json();
+                          if (result.success) {
+                              // Cập nhật lại data-task để modal chi tiết hiển thị đúng
+                              const taskData = JSON.parse(item.dataset.task);
+                              taskData.trang_thai = 'Hoàn thành';
+                              item.dataset.task = JSON.stringify(taskData);
+                              statusSpan.textContent = 'Hoàn thành';
+                              statusSpan.className = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+                          }
+                      }
+                  } else {
+                      if ((currentStatus !== 'Hoàn thành' && currentStatus !== 'Đã xoá') && confirm('Bạn có chắc chắn muốn đánh dấu hoàn thành công việc này?')) { // Other roles cannot complete deleted tasks
+                          const res = await fetch(`/complete/${taskId}?json=1`, {
+                              method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                              body: `nguoi_thuc_hien={{ user }}`
+                          });
+                          const result = await res.json();
+                          if (result.success) {
+                              const taskData = JSON.parse(item.dataset.task);
+                              taskData.trang_thai = 'Hoàn thành';
+                              item.dataset.task = JSON.stringify(taskData);
+                              statusSpan.textContent = 'Hoàn thành';
+                              statusSpan.className = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+                          }
+                      }
+                  }
+              }
+              // Vuốt Phải -> Xoá
+              else if (currentX > 120 && (USER_ROLE !== 'ktv' || (USER_ROLE === 'letan' && item.dataset.task && JSON.parse(item.dataset.task).chi_nhanh === USER_BRANCH))) { // Letan can delete their own branch tasks
+                  if (currentStatus === 'Đã xoá') {
+                      item.style.transform = 'translateX(100%)';
+                      setTimeout(() => item.remove(), 300);
+                  } else if (confirm('Bạn có chắc chắn muốn xoá công việc này?')) {
+                      const res = await fetch(`/delete/${taskId}?json=1`, { method: 'POST' });
+                      const result = await res.json();
+                      if (result.success) {
+                          statusSpan.textContent = 'Đã xoá';
+                          statusSpan.className = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-400';
+                          item.style.opacity = '0.6';
+                          item.style.filter = 'grayscale(50%)';
+                      }
+                  }
+              }
+              // Reset
+              item.style.transform = 'translateX(0px)';
+              item.style.backgroundColor = '';
+              isDragging = false;
+              currentX = 0;
+          });
+
+          item.addEventListener('click', (e) => {
+            // THÊM DÒNG KIỂM TRA NÀY:
+            // Nếu click trúng vào checkbox (hoặc phần tử con của nó),
+            // hãy bỏ qua và để sự kiện nổi bọt lên trên.
+            if (e.target.closest('input.row-checkbox')) {
+                return;
+            }
+
+            // Giữ logic cũ: Nếu click vào các phần còn lại của card,
+            // thì mới chặn sự kiện và mở modal sửa.
+            e.stopPropagation();
+            openEditModal(item);
+        });
+      });
+    </script>
+    
+    <script> <!-- General Modal and Table Interaction -->
+      // --- CẬP NHẬT: Logic cho Slide-over Panel ---
+      function showTaskDetail(task) {
+          const panel = document.getElementById('taskDetailPanel');
+          const backdrop = document.getElementById('taskDetailBackdrop'); // Giữ lại backdrop
+          const panelContent = document.getElementById('taskDetailPanelContent');
+          if (!panel || !backdrop || !panelContent) return;
+
+          // Điền dữ liệu
+          document.getElementById('taskDetailViTri').textContent = task.phong || 'N/A';
+          document.getElementById('taskDetailMoTa').textContent = task.mo_ta || 'Không có mô tả';
+          document.getElementById('taskDetailGhiChu').textContent = task.ghi_chu || 'Không có';
+          document.getElementById('taskDetailHanHoanThanh').textContent = task.han_hoan_thanh || 'N/A';
+          document.getElementById('taskDetailBoPhan').textContent = task.department || 'N/A';
+          document.getElementById('taskDetailNguoiLap').textContent = task.nguoi_tao || 'N/A';
+          document.getElementById('taskDetailNgayTao').textContent = task.ngay_tao || 'N/A';
+          document.getElementById('taskDetailIdTask').textContent = task.id_task || 'N/A';
+
+          // Xử lý hiển thị trạng thái
+          const taskIconContainer = document.getElementById('taskIconContainer');
+          const taskIcon = document.getElementById('taskIcon');
+          
+          // Reset classes
+          taskIconContainer.className = 'grid place-items-center w-12 h-12 rounded-xl transition-colors duration-300';
+          taskIcon.className = 'w-6 h-6';
+
+          if (task.trang_thai === 'Hoàn thành') {
+              taskIconContainer.classList.add('bg-green-100', 'dark:bg-green-900/50');
+              taskIcon.classList.add('text-green-600', 'dark:text-green-300');
+              // Cập nhật icon chính trong header
+              taskIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />`;
+          } else if (task.trang_thai === 'Quá hạn') {
+              taskIconContainer.classList.add('bg-red-100', 'dark:bg-red-900/50');
+              taskIcon.classList.add('text-red-600', 'dark:text-red-300');
+              taskIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />`;
+          } else if (task.trang_thai === 'Đã xoá') {
+              taskIconContainer.classList.add('bg-slate-100', 'dark:bg-slate-700');
+              taskIcon.classList.add('text-slate-600', 'dark:text-slate-300');
+              taskIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />`;
+          } else { // Đang chờ
+              taskIconContainer.classList.add('bg-yellow-100', 'dark:bg-yellow-900/50');
+              taskIcon.classList.add('text-yellow-600', 'dark:text-yellow-300');
+              taskIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />`;
+          }
+
+          // Xử lý lịch sử (hoàn thành/xóa)
+          const historySection = document.getElementById('taskHistorySection');
+          const completedInfo = document.getElementById('completedInfo');
+          const deletedInfo = document.getElementById('deletedInfo');
+          historySection.classList.add('hidden');
+          completedInfo.classList.add('hidden');
+          deletedInfo.classList.add('hidden');
+
+          if (task.trang_thai === 'Hoàn thành') {
+              document.getElementById('taskDetailNguoiHoanThanh').textContent = task.nguoi_thuc_hien;
+              document.getElementById('taskDetailNgayHoanThanh').textContent = task.ngay_hoan_thanh;
+              completedInfo.classList.remove('hidden');
+              historySection.classList.remove('hidden');
+          } else if (task.trang_thai === 'Đã xoá') {
+              document.getElementById('taskDetailNguoiXoa').textContent = task.nguoi_xoa || 'Không rõ';
+              document.getElementById('taskDetailNgayXoa').textContent = task.ngay_xoa;
+              deletedInfo.classList.remove('hidden');
+              historySection.classList.remove('hidden');
+          }
+
+          // Gắn sự kiện cho các nút
+          const btnComplete = document.getElementById('btn-complete');
+          const btnEdit = document.getElementById('btn-edit');
+          const btnDelete = document.getElementById('btn-delete');
+
+          // Ẩn/hiện nút dựa trên trạng thái
+          btnComplete.classList.toggle('hidden', task.trang_thai === 'Hoàn thành' || task.trang_thai === 'Đã xoá');
+          btnEdit.classList.toggle('hidden', task.trang_thai === 'Đã xoá');
+          btnDelete.classList.toggle('hidden', task.trang_thai === 'Đã xoá');
+
+          // Gán lại sự kiện để tránh bị lặp
+          btnEdit.onclick = () => {
+              closeTaskDetailModal();
+              // Đảm bảo openEditModal được gọi sau khi panel đã đóng hoàn toàn
+              setTimeout(() => openEditModal({ dataset: { task: JSON.stringify(task) } }), 300);
+          };
+          btnComplete.onclick = () => {
+            // Gán data-task-id cho nút để hàm completeTask có thể sử dụng
+            btnComplete.setAttribute('data-task-id', task.id);
+            // Gọi hàm completeTask dùng chung
+            completeTask(btnComplete, '{{ user.name }}').then(success => {
+                if (success) {
+                    closeTaskDetailModal(); // Đóng modal chi tiết sau khi hoàn thành
+                }
+            });
+          };
+          btnDelete.onclick = () => {
+              // Gán data-task-id cho nút để hàm deleteTask có thể sử dụng
+              btnDelete.setAttribute('data-task-id', task.id);
+              // Gọi hàm deleteTask dùng chung
+              deleteTask(btnDelete).then(success => {
+                  if (success) {
+                      closeTaskDetailModal(); // Đóng modal chi tiết sau khi xóa
+                  }
+              });
+          };
+
+          // Hiển thị panel
+          panel.classList.remove('hidden'); // Chuyển thành modal
+          panel.classList.add('flex');
+          document.body.classList.add('overflow-hidden');
+          requestAnimationFrame(() => {
+              backdrop.classList.remove('opacity-0');
+              panelContent.classList.remove('opacity-0', 'scale-95');
+          });
+      }
+
+      function closeTaskDetailModal() {
+          const panel = document.getElementById('taskDetailPanel');
+          const backdrop = document.getElementById('taskDetailBackdrop');
+          const panelContent = document.getElementById('taskDetailPanelContent');
+          if (!panel || !backdrop || !panelContent) return;
+
+          panelContent.classList.add('opacity-0', 'scale-95');
+          backdrop.classList.add('opacity-0');
+          
+          setTimeout(() => {
+              panel.classList.add('hidden');
+              panel.classList.remove('flex');
+              document.body.classList.remove('overflow-hidden');
+          }, 300); // Phù hợp với duration của transition
+      }
+
+      function formatDateToDMY(dateStr) {
+        if (!dateStr) return "";
+        const datePart = dateStr.split("T")[0];
+        const d = datePart.split("-");
+        if (d.length === 3) { return `${d[2]}/${d[1]}/${d[0]}`; }
+        return dateStr;
+      }
+
+      function openEditModal(button) {
+        const task = JSON.parse(button.dataset.task);
+        const form = document.getElementById("editForm");
+
+        // Sửa lỗi: Gán task_id cho input ẩn để AJAX sử dụng
+        document.getElementById('edit_task_id').value = task.id;
+        if (form.elements['chi_nhanh']) form.elements['chi_nhanh'].value = task.chi_nhanh || '{{ user_chi_nhanh }}';
+        form.elements['phong'].value = task.phong;
+        form.elements['mo_ta'].value = task.mo_ta;
+        form.elements['bo_phan'].value = task.department;
+        form.elements['ghi_chu'].value = task.ghi_chu || '';
+        form.elements['phong'].focus();
+        openModal('editModal');
+        // Cập nhật datepicker sau khi modal mở để đảm bảo nó được khởi tạo
+        const datePickerInstance = document.querySelector("#edit_han_hoan_thanh")._flatpickr;
+        if (task.han_hoan_thanh_raw) {
+            datePickerInstance.setDate(task.han_hoan_thanh_raw.split('T')[0], true, "Y-m-d");
+        }
+      }
+
+      // Hàm Modal chung (Mở/Đóng)
+      function openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+          modal.classList.remove("hidden");
+          modal.classList.add("flex");
+          document.body.classList.add("overflow-hidden");
+        }
+      }
+      function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+          modal.classList.add("hidden");
+          modal.classList.remove("flex");
+          document.body.classList.remove("overflow-hidden");
+        }
+      }
+      document.addEventListener("keydown", e => {
+        if (e.key === "Escape") {
+          document.querySelectorAll(".modal").forEach(modal => {
+            modal.classList.add("hidden");
+            modal.classList.remove("flex");
+          });
+          document.body.classList.remove("overflow-hidden");
+        }
+      });
+
+      // --- HÀM AJAX ĐỂ HOÀN THÀNH CÔNG VIỆC ---
+      async function completeTask(buttonElement, userName) {
+          if (!confirm('Bạn có chắc chắn muốn đánh dấu hoàn thành công việc này?')) {
+              return false;
+          }
+
+          const taskId = buttonElement.getAttribute('data-task-id');
+          if (!taskId) {
+              console.error("Không tìm thấy task ID trên button.");
+              return false;
+          }
+
+          try {
+              const response = await fetch(`/complete/${taskId}?json=1`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                  body: `nguoi_thuc_hien=${encodeURIComponent(userName)}`
+              });
+
+              const result = await response.json();
+
+              if (result.success) {
+                  // Tìm dòng (tr) hoặc card (div) tương ứng với công việc
+                  const taskRow = document.querySelector(`tr[data-row-id="${taskId}"]`);
+                  const taskCard = document.querySelector(`.swipe-item[data-task-id="${taskId}"]`);
+
+                  if (taskRow) {
+                      const statusCell = taskRow.querySelector('td:nth-last-child(2) span');
+                      if (statusCell) {
+                          statusCell.className = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+                          statusCell.textContent = 'Hoàn thành';
+                      }
+                      // Ẩn nút "Hoàn thành"
+                      buttonElement.remove();
+                  }
+                  showToast('complete');
+                  // Cập nhật cho mobile view nếu có
+                  if (taskCard) {
+                      // Logic cập nhật cho card trên mobile đã có trong hàm vuốt, không cần thêm ở đây
+                  }
+                  return true; // Trả về true nếu thành công
+              } else {
+                  alert('Có lỗi xảy ra: ' + (result.detail || 'Không thể hoàn thành công việc.'));
+                  return false;
+              }
+          } catch (error) {
+              console.error('Lỗi khi gửi yêu cầu hoàn thành:', error);
+              alert('Lỗi kết nối. Vui lòng thử lại.');
+              return false;
+          }
+      }
+
+      async function deleteTask(buttonElement) {
+          if (!confirm('Bạn có chắc chắn muốn xoá công việc này không?')) {
+              return false;
+          }
+      
+          const taskId = buttonElement.getAttribute('data-task-id');
+          if (!taskId) {
+              console.error("Không tìm thấy task ID trên button.");
+              return false;
+          }
+      
+          try {
+              // Gọi endpoint xóa mềm mới
+              const response = await fetch(`/delete/soft/${taskId}`, { 
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' }
+              }); 
+              const result = await response.json();
+      
+              if (!response.ok) {
+                  throw new Error(result.detail || 'Lỗi không xác định từ server.');
+              }
+      
+              if (result.success && result.task) {
+                  showToast('delete');
+                  const taskRow = document.querySelector(`tr[data-row-id="${taskId}"]`);
+                  const taskCard = document.querySelector(`.swipe-item[data-task-id="${taskId}"]`);
+      
+                  // Cập nhật giao diện (cho cả table và card)
+                  const updatedTaskData = JSON.stringify(result.task); // Dữ liệu task mới từ backend
+                  const statusClass = 'bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-400';
+                  const statusText = 'Đã xoá';
+      
+                  if (taskRow) {
+                      taskRow.setAttribute('data-task', updatedTaskData); // Cập nhật data-task
+                      const statusCell = taskRow.querySelector('td:nth-last-child(2) span');
+                      statusCell.className = `inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${statusClass}`;
+                      statusCell.textContent = statusText;
+                      // Xóa các nút thao tác
+                      taskRow.querySelector('td:last-child .flex').innerHTML = '';
+                      // Thêm hiệu ứng mờ đi
+                      taskRow.style.opacity = '0.6';
+                      taskRow.style.filter = 'grayscale(50%)';
+                  }
+                  if (taskCard) {
+                      taskCard.setAttribute('data-task', updatedTaskData); // Cập nhật data-task
+                      const statusSpan = taskCard.querySelector('.flex.justify-between.items-center span');
+                      statusSpan.className = `inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${statusClass}`;
+                      statusSpan.textContent = statusText;
+                      // Thêm hiệu ứng mờ đi
+                      taskCard.style.opacity = '0.6';
+                      taskCard.style.filter = 'grayscale(50%)';
+                  }
+      
+                  return true;
+              } else {
+                  alert('Có lỗi xảy ra: ' + (result.detail || 'Không thể xóa công việc.'));
+                  return false;
+              }
+          } catch (error) {
+              console.error('Lỗi khi gửi yêu cầu xóa:', error);
+              alert('Lỗi khi xóa: ' + error.message);
+              return false;
+          }
+      }
+    </script>
+
+    <script>
+      // --- HÀM DÙNG CHUNG: TẠO DÒNG BẢNG CHO CÔNG VIỆC ---
+      function createTaskRow(t) {
+          const statusClass = t.trang_thai === 'Hoàn thành' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
+                              t.trang_thai === 'Quá hạn' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' :
+                              t.trang_thai === 'Đang chờ' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' :
+                              'bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-400';
+
+          let actionButtons = '';
+          const canPerformActions = ['quanly', 'ktv', 'admin', 'boss', 'buongphong', 'baove'].includes(USER_ROLE) || (USER_ROLE === 'letan' && t.chi_nhanh === USER_CHI_NHANH);
+          const canDelete = ['quanly', 'admin', 'boss'].includes(USER_ROLE) || (USER_ROLE === 'letan' && t.chi_nhanh === USER_CHI_NHANH);
+          
+          if (canPerformActions && t.trang_thai !== 'Hoàn thành' && t.trang_thai !== 'Đã xoá') {
+              actionButtons += `<button title="Hoàn thành" class="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 transition complete-btn-ajax" data-task-id="${t.id}" onclick="event.stopPropagation(); completeTask(this, '${USER_NAME}');"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg></button>`;
+          }
+
+          const taskJsonString = JSON.stringify(t).replace(/'/g, '&#39;');
+
+          if (canPerformActions) {
+              actionButtons += `<button title="Sửa" class="text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300 transition" onclick="event.stopPropagation(); openEditModal(this)" data-task='${taskJsonString}'><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 11l6.232-6.232a2 2 0 112.828 2.828L11.828 13.828a2 2 0 01-1.414.586H7v-3a2 2 0 01.586-1.414z" /></svg></button>`;
+          }
+
+          if (canDelete) {
+              actionButtons += `<button title="Xoá" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition delete-btn-ajax" data-task-id="${t.id}" onclick="event.stopPropagation(); deleteTask(this);"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>`;
+          }
+
+          let checkboxCell = '';
+          if (['quanly', 'admin', 'boss'].includes(USER_ROLE) || (USER_ROLE === 'letan' && t.chi_nhanh === USER_CHI_NHANH)) {
+               checkboxCell = `<td class="px-4 py-3 text-center"><input type="checkbox" class="row-checkbox h-4 w-4 rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 bg-white dark:bg-slate-700 pointer-events-auto" data-id="${t.id}"></td>`;
+          }
+
+          const newRow = document.createElement('tr');
+          newRow.setAttribute('onclick', 'handleRowClick(event, this)');
+          newRow.setAttribute('data-task', JSON.stringify(t));
+          newRow.setAttribute('data-row-id', t.id);
+          newRow.className = 'bg-white border-b dark:bg-slate-900 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors duration-150';
+          if (t.trang_thai === 'Đã xoá') {
+              newRow.style.opacity = '0.6';
+              newRow.style.filter = 'grayscale(50%)';
+          }
+
+          newRow.innerHTML = `${checkboxCell}<td class="px-4 py-3 text-left font-mono text-xs whitespace-nowrap" title="${t.id_task}">${t.id_task}</td><td class="px-4 py-3 text-center break-words">${t.phong}</td><td class="hidden lg:table-cell px-4 py-3 text-left whitespace-nowrap">${t.department}</td><td class="px-4 py-3 text-center max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap" title="${t.mo_ta}">${t.mo_ta}</td><td class="hidden md:table-cell px-4 py-3 text-center max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap" title="${t.ghi_chu || ''}">${t.ghi_chu || ''}</td><td class="px-4 py-3 text-center"><span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${statusClass}">${t.trang_thai}</span></td><td class="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-300"><div class="flex justify-center flex-wrap gap-1 max-w-[80px] mx-auto pointer-events-auto">${actionButtons}</div></td>`;
+          return newRow;
+      }
+    </script>
+
+    <script> 
+      // Bulk Actions (Checkboxes, Delete Selected) - ĐÃ CẬP NHẬT HOÀN CHỈNH
+      document.addEventListener('DOMContentLoaded', function () {
+        let lastCheckedCheckbox = null;
+        const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        // Giả sử USER_ROLE được định nghĩa ở đâu đó trong scope global hoặc lấy từ template
+        // const USER_ROLE = "{{ user.role }}"; // Lấy từ template Jinja2
+
+        // Hàm cập nhật trạng thái hiển thị của nút "Xóa mục đã chọn"
+        function updateDeleteButtonState() {
+            if (!deleteSelectedBtn) return;
+            const selectedCheckboxes = document.querySelectorAll('.row-checkbox:checked');
+            // Chỉ hiển thị nút nếu là admin/boss/letan VÀ có ít nhất một mục được chọn
+            if (['admin', 'boss', 'letan'].includes(USER_ROLE) && selectedCheckboxes.length > 0) {
+                deleteSelectedBtn.classList.remove('hidden');
+                // Cập nhật text nút để rõ ràng hơn
+                deleteSelectedBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 01-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0111 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                    Xóa ( ${selectedCheckboxes.length} ) mục`;
+            } else {
+                deleteSelectedBtn.classList.add('hidden');
+            }
+        }
+        
+        // Hàm cập nhật trạng thái của checkbox "Chọn tất cả"
+        function updateSelectAllCheckboxState() {
+            if (!selectAllCheckbox) return;
+            const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+            const totalRows = rowCheckboxes.length;
+            // Nếu không có hàng nào, bỏ check và indeterminate
+            if (totalRows === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+                return; // Dừng hàm tại đây
+            }
+            // Đếm số checkbox đã được check
+            const checkedRows = document.querySelectorAll('.row-checkbox:checked').length;
+            
+            if (checkedRows === 0) { // Không có cái nào check
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (checkedRows < totalRows) { // Check một phần
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            } else { // Check tất cả
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            }
+        }
+
+        // Gắn sự kiện cho checkbox "Chọn tất cả"
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                lastCheckedCheckbox = null; // Reset checkbox "neo" khi chọn tất cả
+                // Check hoặc bỏ check tất cả các checkbox hàng
+                document.querySelectorAll('.row-checkbox').forEach(checkbox => {
+                    checkbox.checked = isChecked;
+                });
+                selectAllCheckbox.indeterminate = false; // Bỏ trạng thái indeterminate
+                updateDeleteButtonState(); // Cập nhật trạng thái nút xóa
+            });
+        }
+        
+        // Gắn sự kiện click vào document để xử lý checkbox hàng và Shift+Click
+        document.addEventListener('click', function(e) {
+            // Chỉ xử lý khi click vào một checkbox của hàng
+            if (e.target.tagName === 'INPUT' && e.target.classList.contains('row-checkbox')) {
+                const checkbox = e.target;
+
+                // Xử lý Shift + Click
+                if (e.shiftKey && lastCheckedCheckbox && lastCheckedCheckbox !== checkbox) {
+                    const allCheckboxes = Array.from(document.querySelectorAll('.row-checkbox'));
+                    const start = allCheckboxes.indexOf(lastCheckedCheckbox);
+                    const end = allCheckboxes.indexOf(checkbox);
+
+                    // Đảm bảo cả hai checkbox đều nằm trong danh sách
+                    if (start !== -1 && end !== -1) {
+                        const rangeStart = Math.min(start, end);
+                        const rangeEnd = Math.max(start, end);
+                        // Áp dụng trạng thái của checkbox vừa click cho cả dải
+                        const isChecked = checkbox.checked; 
+                        for (let i = rangeStart; i <= rangeEnd; i++) {
+                            // Chỉ thay đổi trạng thái nếu khác với trạng thái mong muốn
+                            if(allCheckboxes[i].checked !== isChecked) {
+                                allCheckboxes[i].checked = isChecked;
+                            }
+                        }
+                    }
+                    // Giữ nguyên lastCheckedCheckbox sau khi dùng Shift
+                } else {
+                    // Cập nhật checkbox "neo" khi click bình thường
+                    lastCheckedCheckbox = checkbox;
+                }
+
+                // Cập nhật trạng thái nút xóa và checkbox "Chọn tất cả" sau mỗi lần click
+                updateDeleteButtonState();
+                updateSelectAllCheckboxState();
+            }
+        });
+
+        // Gắn sự kiện cho nút "Xóa mục đã chọn"
+        if (deleteSelectedBtn) { 
+            deleteSelectedBtn.addEventListener('click', () => {
+                const selectedTaskIds = Array.from(document.querySelectorAll('.row-checkbox:checked'))
+                                            .map(cb => parseInt(cb.dataset.id, 10))
+                                            .filter(id => !isNaN(id));
+
+                if (selectedTaskIds.length === 0) {
+                    alert('Vui lòng chọn ít nhất một công việc để xóa.');
+                    return;
+                }
+
+                // Phân luồng xử lý dựa trên vai trò người dùng
+                if (['admin', 'boss'].includes(USER_ROLE)) {
+                    // Hành vi cũ: Xóa vĩnh viễn cho admin/boss
+                    if (confirm(`⚠️ CẢNH BÁO: Bạn sắp XÓA VĨNH VIỄN ${selectedTaskIds.length} công việc đã chọn. Hành động này không thể hoàn tác. Bạn có chắc chắn không?`)) {
+                        callBatchDeleteAPI('/api/tasks/batch-delete-permanent', selectedTaskIds, true);
+                    }
+                } else {
+                    // Hành vi mới: Xóa mềm cho các vai trò khác (Lễ tân, Quản lý)
+                    if (confirm(`Bạn có chắc chắn muốn xóa ${selectedTaskIds.length} công việc đã chọn không?`)) {
+                        callBatchDeleteAPI('/api/tasks/batch-delete-soft', selectedTaskIds, false);
+                    }
+                }
+            });
+        }
+
+        // Hàm helper để gọi API và xử lý kết quả
+        async function callBatchDeleteAPI(apiUrl, taskIds, isHardDelete) {
+            deleteSelectedBtn.disabled = true;
+            deleteSelectedBtn.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Đang xóa...`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task_ids: taskIds })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || `Lỗi ${response.status}`);
+                }
+
+                if (data.success) {
+                    showToast('delete');
+                    if (isHardDelete) {
+                        taskIds.forEach(id => {
+                            document.querySelector(`tr[data-row-id="${id}"]`)?.remove();
+                            document.querySelector(`.swipe-item[data-task-id="${id}"]`)?.remove();
+                        });
+                    } else {
+                        data.tasks.forEach(updatedTask => {
+                            const taskRow = document.querySelector(`tr[data-row-id="${updatedTask.id}"]`);
+                            if (taskRow) {
+                                const newRow = createTaskRow(updatedTask);
+                                taskRow.replaceWith(newRow);
+                            }
+                            const taskCard = document.querySelector(`.swipe-item[data-task-id="${updatedTask.id}"]`);
+                            if (taskCard) {
+                                taskCard.setAttribute('data-task', JSON.stringify(updatedTask));
+                                const statusSpan = taskCard.querySelector('.flex.justify-between.items-center span');
+                                statusSpan.className = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-400';
+                                statusSpan.textContent = 'Đã xoá';
+                                taskCard.style.opacity = '0.6';
+                                taskCard.style.filter = 'grayscale(50%)';
+                            }
+                        });
+                    }
+
+                    if (selectAllCheckbox) {
+                        selectAllCheckbox.checked = false;
+                        selectAllCheckbox.indeterminate = false;
+                    }
+                    updateDeleteButtonState();
+                } else {
+                    throw new Error(data.detail || 'Lỗi không xác định khi xóa.');
+                }
+            } catch (err) {
+                alert(`Lỗi khi xóa hàng loạt: ${err.message}`);
+            } finally {
+                deleteSelectedBtn.disabled = false;
+                updateDeleteButtonState();
+            }
+        }
+
+        // Khởi tạo trạng thái ban đầu của các nút và checkbox khi tải trang
+        updateDeleteButtonState();
+        updateSelectAllCheckboxState();
+      });
+    </script>
+    
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll("[data-countup]").forEach(el => {
+          const target = +el.dataset.countup;
+          let count = 0;
+          const step = Math.max(1, Math.floor(target / 40));
+          const interval = setInterval(() => {
+            count += step;
+            if (count >= target) {
+              el.textContent = target;
+              clearInterval(interval);
+            } else {
+              el.textContent = count;
+            }
+          }, 20);
+        });
+      });
+    </script>
+
+    <script> <!-- Chart Rendering -->
+      let barChartInstance = null;
+      const thongKeData = JSON.parse('{{ thong_ke | tojson | safe }}');
+
+      function getChartTextColor() {
+        return document.documentElement.classList.contains('dark') ? "#e5e7eb" : "#374151";
+      }
+
+      function renderCharts() {
+        const dashboard = document.getElementById("dashboardSection");
+        if (dashboard.classList.contains("hidden") || barChartInstance) {
+          return;
+        }
+        const textColor = getChartTextColor();
+        Chart.defaults.color = textColor;
+        barChartInstance = new Chart(document.getElementById("barChart"), {
+            type: "bar",
+            data: {
+                labels: ["Hoàn thành", "Đang chờ", "Quá hạn"],
+                datasets: [{
+                    data: [thongKeData.hoan_thanh, thongKeData.dang_cho, thongKeData.qua_han],
+                    backgroundColor: ["#10b981", "#fbbf24", "#ef4444"],
+                    borderRadius: 6, barPercentage: 0.6, categoryPercentage: 0.6
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1, color: textColor }, grid: { display: false } },
+                    x: { ticks: { color: textColor }, grid: { display: false } }
+                }
+            }
+        });
+      }
+
+      // CẬP NHẬT QUAN TRỌNG:
+      // Lắng nghe sự kiện 'themeChanged' từ base.html thay vì click vào nút #toggleDark
+      window.addEventListener('themeChanged', (e) => {
+          setTimeout(() => {
+            if (barChartInstance) {
+                const newColor = getChartTextColor();
+                barChartInstance.options.scales.y.ticks.color = newColor;
+                barChartInstance.options.scales.x.ticks.color = newColor;
+                Chart.defaults.color = newColor;
+                barChartInstance.update();
+            }
+          }, 50);
+      });
+
+      // Logic Ẩn/Hiện Dashboard
+      const toggleBtn = document.getElementById("toggleDashboard");
+      const dashboard = document.getElementById("dashboardSection");
+      if (localStorage.getItem("dashboardHidden") === "true") {
+        dashboard.classList.add("hidden");
+      } else {
+        dashboard.classList.remove("hidden");
+        renderCharts(); // Render khi tải trang
+      }
+      toggleBtn?.addEventListener("click", () => {
+        const isHidden = dashboard.classList.toggle("hidden");
+        localStorage.setItem("dashboardHidden", isHidden ? "true" : "false");
+        if (!isHidden) {
+          renderCharts(); // Render khi bấm nút hiện
+        }
+      });
+    </script>
+
+    <script> <!-- Flatpickr Initialization -->
+      // base.html đã tải thư viện, chúng ta chỉ cần khởi tạo
+      flatpickr(".datepicker", {
+        dateFormat: "Y-m-d", altInput: true, altFormat: "d/m/Y", locale: "vn"
+      });
+    </script>
+
+    <script> <!-- Form Submission (Prevent Enter Key) -->
+      document.addEventListener("DOMContentLoaded", () => {
+        const form = document.querySelector('form[action="/add"]');
+        const submitButton = form?.querySelector('button[type="submit"]');
+        form?.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" && e.target.tagName.toLowerCase() !== "textarea") {
+            if (document.activeElement !== submitButton) {
+              e.preventDefault();
+            }
+          }
+        });
+      });
+    </script>
+
+    <script> // --- GIẢI PHÁP ÂM THANH MỚI ---
+      // Hàm này sẽ "mở khóa" AudioContext của trình duyệt bằng cách phát một âm thanh câm
+      // khi người dùng tương tác lần đầu tiên. Sau đó, các âm thanh khác có thể phát tự do.
+      (function() {
+        let audioUnlocked = false;
+        const unlockAudio = () => {
+          if (audioUnlocked) return;
+          const audio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+          audio.play().then(() => { audioUnlocked = true; }).catch(() => {});
+          document.body.removeEventListener('click', unlockAudio);
+        };
+        document.body.addEventListener('click', unlockAudio, { once: true });
+      })();
+    </script>
+
+    <script> // --- LOGIC HIỂN THỊ THÔNG BÁO (TOAST) MỚI ---
+      function showToast(action) {
+        const toastMap = {
+          add: { title: "Đã thêm công việc", message: "Công việc mới đã được tạo thành công.", bg: "#10b981", sound: "/static/sounds/Add.mp3",
+            icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-green-500/10 animate-bounce-in"><svg class="w-5 h-5 text-green-700 dark:text-green-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></div>`
+          },
+          update: { title: "Đã cập nhật công việc", message: "Thông tin đã được chỉnh sửa.", bg: "#3b82f6", sound: "/static/sounds/Update.mp3",
+            icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500/10 animate-scale-fade"><svg class="w-5 h-5 text-blue-700 dark:text-blue-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></div>`
+          },
+          complete: { title: "Hoàn thành", message: "Công việc đã được đánh dấu xong.", bg: "#0ea5e9", sound: "/static/sounds/Complete.mp3",
+            icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-sky-500/10 animate-rotate-in"><svg class="w-5 h-5 text-sky-700 dark:text-sky-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div>`
+          },
+          delete: { title: "Đã xoá công việc", message: "Mục đã bị xoá khỏi danh sách.", bg: "#ef4444", sound: "/static/sounds/Delete.mp3",
+            icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/10 animate-shake"><svg class="w-5 h-5 text-red-700 dark:text-red-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></div>`
+          },
+          default: { title: "Thành công", message: "Thao tác đã được thực hiện.", bg: "#6366f1", sound: "/static/sounds/Add.mp3",
+            icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-indigo-500/10 animate-fade-in"><svg class="w-5 h-5 text-indigo-700 dark:text-indigo-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div>`
+          }
+        };
+        const config = toastMap[action] || toastMap.default;
+        let toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement("div");
+            toastContainer.id = 'toast-container';
+            toastContainer.className = "fixed top-6 right-6 z-[9999] flex flex-col gap-3";
+            document.body.appendChild(toastContainer);
+        }
+        const toast = document.createElement("div");
+        toast.className = `group relative overflow-hidden transition-all shadow-xl border border-gray-200 dark:border-gray-700 rounded-xl px-5 py-4 w-[300px] bg-white dark:bg-[#1f2937] backdrop-blur-md animate-toastIn`;
+        toast.innerHTML = `
+          <div class="flex items-start gap-3">
+            <div class="mt-1">${config.icon}</div>
+            <div class="flex-1">
+              <div class="text-sm font-semibold text-gray-800 dark:text-white">${config.title}</div>
+              <div class="text-xs text-gray-600 dark:text-gray-300 mt-0.5">${config.message}</div>
+            </div>
+          </div>
+          <div class="progress-bar absolute bottom-0 left-0 h-[3px] bg-opacity-80"
+              style="background-color: ${config.bg}; width: 100%; transition: none;"></div>`;
+        toastContainer.appendChild(toast);
+
+        if (config.sound) {
+          const audio = new Audio(config.sound);
+          audio.volume = 0.6;
+          audio.play().catch(err => { console.warn("⚠️ Không phát được âm thanh:", err.message); });
+        }
+
+        let duration = 3500, elapsed = 0, last = performance.now();
+        const progress = toast.querySelector('.progress-bar');
+        const updateProgress = (now) => {
+          if (!toast._paused) elapsed += now - last;
+          last = now;
+          const percent = Math.max(0, 1 - elapsed / duration);
+          progress.style.width = `${percent * 100}%`;
+          if (elapsed < duration) { toast._rafId = requestAnimationFrame(updateProgress); } 
+          else {
+            toast.classList.add("opacity-0", "translate-x-6");
+            toast.style.transition = "all 0.4s ease-in-out";
+            setTimeout(() => toast.remove(), 400);
+          }
+        };
+        toast._paused = false;
+        toast._rafId = requestAnimationFrame(updateProgress);
+        toast.addEventListener("mouseenter", () => toast._paused = true);
+        toast.addEventListener("mouseleave", () => {
+          if (toast._rafId) cancelAnimationFrame(toast._rafId);
+          toast._paused = false; last = performance.now();
+          toast._rafId = requestAnimationFrame(updateProgress);
+        });
+      }
+    </script>
+
+    {% if request.query_params.get("success") == "1" %} <!-- Success Toasts (Backward Compatibility) -->
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const params = new URLSearchParams(window.location.search);
+        const action = params.has("action") ? params.get("action").toLowerCase() : "";
+        if (action) {
+          showToast(action);
+        }
+        setTimeout(() => {
+          const cleanUrl = window.location.origin + window.location.pathname;
+          history.replaceState({}, document.title, cleanUrl);
+        }, 800);
+      });
+    </script>
+    {% endif %}
+
+    <script>
+      if (window.location.search) { <!-- Page Reload Handling -->
+        if (performance.getEntriesByType("navigation")[0]?.type === "reload") {
+          window.location.href = "/tasks";
+        }
+      }
+    </script>
+
+    <script>
+      document.querySelectorAll("form[method='post']").forEach(form => { <!-- Scroll Position Restoration -->
+        form.addEventListener("submit", () => {
+          localStorage.setItem("scrollY", window.scrollY);
+        });
+      });
+      document.addEventListener("DOMContentLoaded", () => {
+        const y = localStorage.getItem("scrollY");
+        if (y !== null) {
+          setTimeout(() => {
+            window.scrollTo(0, parseInt(y));
+            localStorage.removeItem("scrollY");
+          }, 10);
+        }
+      });
+    </script>
+
+    <script> <!-- Row Click Handling (Task Details) -->
+      function handleRowClick(event, row) {
+        if (event.target.closest("button, svg, path, form, input")) return;
+        try {
+          const taskJson = row.dataset.task;
+          if (!taskJson) return;
+          const task = JSON.parse(taskJson);
+          showTaskDetail(task);
+        } catch (e) {
+          console.error("❌ Lỗi parse task:", e);
+        }
+      }
+    </script>
+
+    <script> // AJAX for Add/Edit Forms
+        document.addEventListener('DOMContentLoaded', function() {
+            const addTaskForm = document.getElementById('addTaskForm');
+            const editTaskForm = document.getElementById('editForm');
+
+            if (addTaskForm) {
+                addTaskForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(addTaskForm);
+                    const submitButton = addTaskForm.closest('.modal').querySelector('button[type="submit"]');
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Đang thêm...';
+
+                    try {
+                        const response = await fetch('/add?json=1', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const result = await response.json();
+                        if (result.success && result.task) {
+                            const tableBody = document.querySelector('tbody');
+                            if (tableBody) {
+                                const newRow = createTaskRow(result.task);
+                                tableBody.insertAdjacentElement('afterbegin', newRow);
+                            }
+                            closeModal('addTaskModal');
+                            showToast('add');
+                        } else {
+                            throw new Error(result.detail || 'Không thể thêm công việc.');
+                        }
+                    } catch (error) {
+                        alert('Lỗi: ' + error.message);
+                    } finally {
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Thêm công việc';
+                    }
+                });
+            }
+
+            if (editTaskForm) {
+                editTaskForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const taskId = document.getElementById('edit_task_id').value;
+                    const formData = new FormData(editTaskForm);
+                    const submitButton = editTaskForm.closest('.modal').querySelector('button[type="submit"]');
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Đang cập nhật...';
+
+                    try {
+                        const response = await fetch(`/edit/${taskId}?json=1`, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const result = await response.json();
+                        if (result.success && result.task) {
+                            const taskRow = document.querySelector(`tr[data-row-id="${taskId}"]`);
+                            if (taskRow) {
+                                const newRowElement = createTaskRow(result.task);
+                                taskRow.replaceWith(newRowElement);
+                            }
+                            closeModal('editModal');
+                            showToast('update');
+                        } else {
+                            throw new Error(result.detail || 'Không thể cập nhật công việc.');
+                        }
+                    } catch (error) {
+                        alert('Lỗi: ' + error.message);
+                    } finally {
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Cập nhật';
+                    }
+                });
+            }
+        });
+    </script>
+
+    <script>
+      // --- SCRIPT MỚI: XỬ LÝ DROPDOWN CHỌN SỐ LƯỢNG HIỂN THỊ ---
+      document.addEventListener('DOMContentLoaded', function() {
+          const perPageSelect = document.getElementById('per-page-select');
+          if (perPageSelect) {
+              perPageSelect.addEventListener('change', function() {
+                  const newPerPage = this.value;
+                  const currentUrl = new URL(window.location.href);
+                  currentUrl.searchParams.set('per_page', newPerPage);
+                  currentUrl.searchParams.set('page', '1'); // Reset về trang 1 khi thay đổi số lượng
+                  window.location.href = currentUrl.toString();
+              });
+          }
+      });
+    </script>
+    <script> <!-- Shift Change Logout -->
+      function checkAndLogoutForShiftChange() {
+          const now = new Date();
+          const hours = now.getHours();
+          const minutes = now.getMinutes();
+          const isMorningLogout = (hours === 6 && minutes === 59);
+          const isEveningLogout = (hours === 18 && minutes === 59);
+          if (isMorningLogout || isEveningLogout) {
+              console.log("Đã đến giờ chuyển ca, tự động đăng xuất...");
+              window.location.href = '/logout';
+          }
+      }
+      setInterval(checkAndLogoutForShiftChange, 30000);
+    </script>
+    
+    <script> <!-- Excel Export -->
+      const exportBtn = document.getElementById('export-excel-btn');
+      if (exportBtn) {
+        exportBtn.addEventListener('click', function () {
+          const chi_nhanh_el = document.getElementById('filter_chi_nhanh');
+          const chi_nhanh = chi_nhanh_el && chi_nhanh_el.value
+            ? chi_nhanh_el.value
+            : "{{ user['chi_nhanh'] if user['role'] == 'letan' else '' }}";
+          const search_el = document.getElementById('filter_search');
+          const search = search_el ? search_el.value.trim() : '';
+          const trang_thai_el = document.getElementById('filter_trang_thai');
+          const trang_thai = trang_thai_el ? trang_thai_el.value : '';
+          const han_hoan_thanh_el = document.getElementById('filter_han_hoan_thanh');
+          const han_hoan_thanh = han_hoan_thanh_el ? han_hoan_thanh_el.value : '';
+          const params = new URLSearchParams({
+            chi_nhanh, search, trang_thai, han_hoan_thanh
+          });
+          const exportUrl = `/api/tasks/export-excel?${params.toString().replace(/%2F/g, '/')}`;
+          window.open(exportUrl, '_blank');
+        });
+      }
+    </script>
+
+    <script> // FullCalendar Logic
+      document.addEventListener('DOMContentLoaded', function() {
+        const calendarEl = document.getElementById('fullCalendar');
+        let calendarInstance = null;
+    
+        function initializeCalendar() {
+          if (calendarInstance) {
+            calendarInstance.destroy();
+          }
+          calendarInstance = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'vi',
+            headerToolbar: {
+              left: 'prev,next today',
+              center: 'title',
+              right: 'dayGridMonth,listWeek'
+            },
+            buttonText: {
+              today: 'Hôm nay',
+              month: 'Tháng',
+              list: 'Danh sách'
+            },
+            events: '/api/tasks/calendar-events', // Endpoint mới để lấy dữ liệu
+            eventClick: function(info) {
+              info.jsEvent.preventDefault(); // Ngăn chặn hành vi mặc định
+              const task = info.event.extendedProps.task_data;
+              // SỬA LỖI: Không đóng modal lịch, chỉ hiển thị chi tiết công việc lên trên.
+              if (task) { showTaskDetail(task); }
+            },
+            slotEventOverlap: false, // <-- THÊM DÒNG NÀY: Ngăn các sự kiện chồng chéo lên nhau
+            eventContent: function(arg) {
+                // Tùy chỉnh cách hiển thị sự kiện trên lịch dựa trên chế độ xem
+                let contentEl = document.createElement('div');
+                contentEl.classList.add('fc-event-title', 'fc-sticky');
+                
+                // Cấu trúc lại logic để xử lý tất cả các trường hợp một cách rõ ràng
+                const viewType = arg.view.type;
+                const isAllDay = arg.isAllDay;
+
+                if (viewType === 'dayGridMonth' || isAllDay) {
+                  // Chế độ xem Tháng, Tuần, hoặc bất kỳ sự kiện "all-day" nào: chỉ hiển thị ID công việc.
+                  // Điều này đảm bảo hàng "all-day" trong chế độ xem Tuần cũng được hiển thị.
+                  contentEl.innerHTML = `<b>${arg.event.extendedProps.id_task || ''}</b>`;
+                } else {
+                  // Chế độ xem Danh sách (listWeek): hiển thị ID - Vị trí - Mô tả.
+                  contentEl.innerHTML = `<b>${arg.event.extendedProps.id_task || ''}</b> - <b>${arg.event.extendedProps.phong || ''}</b>: ${arg.event.title}`;
+                }
+                return { domNodes: [contentEl] };
+            },
+            // Thay đổi màu sắc sự kiện dựa trên trạng thái
+            eventDidMount: function(info) {
+              const status = info.event.extendedProps.trang_thai;
+              if (status === 'Hoàn thành') {
+                info.el.style.backgroundColor = '#10b981'; // Green
+                info.el.style.borderColor = '#0f9a6c';
+              } else if (status === 'Quá hạn') {
+                info.el.style.backgroundColor = '#ef4444'; // Red
+                info.el.style.borderColor = '#d02828';
+              } else if (status === 'Đang chờ') {
+                info.el.style.backgroundColor = '#f59e0b'; // Amber
+                info.el.style.borderColor = '#d97706';
+              } else if (status === 'Đã xoá') {
+                info.el.style.backgroundColor = '#6b7280'; // Slate 500
+                info.el.style.borderColor = '#4b5563'; // Slate 600
+              }
+            }
+          });
+          calendarInstance.render();
+        }
+    
+        // Chỉ khởi tạo lịch khi modal được mở
+        const calendarModal = document.getElementById('calendarModal');
+        const observer = new MutationObserver(mutations => {
+          if (mutations[0].attributeName === 'class' && !calendarModal.classList.contains('hidden')) {
+            initializeCalendar();
+          }
+        });
+        observer.observe(calendarModal, { attributes: true });
+      });
+    </script>
+
+{% endblock %}

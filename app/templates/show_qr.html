@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Điểm danh bằng QR</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto"]
+          },
+          boxShadow: {
+            glow: "0 0 20px rgba(61, 140, 246, 0.35)"
+          },
+          colors: {
+            brand: { 500: '#3d8cf6', 600: '#2f74e9', 700: '#285fca' }
+          },
+          keyframes: {
+            fadeInUp: { '0%': {opacity: 0, transform: 'translateY(20px)'}, '100%': {opacity: 1, transform: 'translateY(0)'} },
+            pulseGlow: { '0%,100%': { boxShadow: '0 0 0 rgba(61,140,246,0)' }, '50%': { boxShadow: '0 0 20px rgba(61,140,246,0.6)' } },
+            /* Thêm keyframe cho background động */
+            auroraMove: {
+              'from': { transform: 'translate(-20vw, -20vh) rotate(0deg)' },
+              'to': { transform: 'translate(20vw, 20vh) rotate(180deg)' }
+            }
+          },
+          animation: {
+            fadeInUp: 'fadeInUp .6s ease-out',
+            pulseGlow: 'pulseGlow 2s infinite',
+            /* Thêm animation cho background động */
+            auroraMove: 'auroraMove 20s infinite linear alternate'
+          }
+        }
+      },
+      darkMode: 'class'
+    }
+  </script>
+  <style>
+    /* === BẮT ĐẦU CSS BACKGROUND MỚI === */
+    
+    /* 1. Nền cho Light Mode: "Aurora" động với các màu sáng. */
+    body::after {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100dvh;
+      z-index: -2; /* Đặt sau cùng */
+      opacity: 0.4; /* Độ mờ cho light mode */
+      transition: opacity 0.3s ease;
+      background: 
+        radial-gradient(circle at 10% 20%, #87ceeb 0%, transparent 40%), /* Sky Blue */
+        radial-gradient(circle at 80% 70%, #fdbb74 0%, transparent 40%); /* Soft Orange */
+      filter: blur(120px);
+      animation: auroraMove 20s infinite linear alternate;
+    }
+
+    /* 2. Nền cho Dark Mode: "Aurora" động với các màu tối. */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100dvh;
+      z-index: -1; 
+      opacity: 0; /* Ẩn ở light mode */
+      transition: opacity 0.3s ease;
+      background: 
+        radial-gradient(circle at 10% 20%, #805ad5 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, #2563eb 0%, transparent 40%);
+      filter: blur(120px);
+      animation: auroraMove 20s infinite linear alternate;
+    }
+    
+    /* Logic chuyển đổi: Khi ở dark mode, ẩn 'after', hiện 'before' */
+    .dark body::before {
+      opacity: 0.3; /* Hiện aurora tối */
+    }
+    .dark body::after {
+      opacity: 0; /* Ẩn aurora sáng */
+    }
+
+    /* === KẾT THÚC CSS BACKGROUND MỚI === */
+  </style>
+</head>
+<body class="h-full bg-slate-100 dark:bg-[#18192a] text-gray-900 dark:text-gray-100 flex items-center justify-center relative overflow-hidden isolation-isolate p-4">
+  <div class="max-w-4xl w-full animate-fadeInUp">
+    <div class="rounded-3xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shadow-xl p-6 sm:p-8 md:p-10 relative overflow-hidden z-10">
+      <button id="btn-theme" class="absolute top-4 right-4 rounded-full p-2 bg-white/50 dark:bg-gray-800/50 hover:bg-gray-200 dark:hover:bg-gray-700 transition" aria-label="Đổi giao diện">
+        <svg id="icon-sun" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+           <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+           <path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"></path>
+           <path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"></path>
+        </svg>
+        <svg id="icon-moon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+           <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+           <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"></path>
+           <path d="M17 4a2 2 0 0 0 2 2a2 2 0 0 0 -2 2a2 2 0 0 0 -2 -2a2 2 0 0 0 2 -2"></path>
+           <path d="M19 11h2m-1 -1v2"></path>
+        </svg>
+      </button>
+
+      <div class="relative grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+        <div class="flex flex-col items-center justify-center">
+          <div class="mx-auto aspect-square max-w-[280px] w-full rounded-2xl bg-white/50 dark:bg-gray-800/50 grid place-items-center p-4 shadow-glow animate-pulseGlow">
+            <canvas id="qrcode" class="w-full h-full"></canvas>
+          </div>
+          <div id="status-dot" class="mt-6 inline-flex items-center gap-2 text-sm px-3 py-1 rounded-full bg-white/50 dark:bg-gray-800/50">
+            <span class="relative flex size-2.5"><span class="absolute inline-flex w-full h-full rounded-full bg-brand-500 opacity-75 animate-ping"></span><span class="relative inline-flex size-2.5 rounded-full bg-brand-500"></span></span>
+            <span id="status-text">Đang chờ điện thoại điểm danh…</span>
+          </div>
+        </div>
+
+        <div class="text-center md:text-left flex flex-col justify-center">
+          <h1 class="text-2xl sm:text-3xl font-bold mb-2">Điểm danh bằng QR</h1>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">Quét mã trên điện thoại của bạn để xác nhận điểm danh.</p>
+
+          <div class="flex flex-wrap justify-center md:justify-start gap-3">
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded-full text-sm font-medium border border-blue-200 dark:border-blue-800" title="Mã nhân viên: {{ user.code }}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span>{{ user.name }}</span>
+            </div>
+
+            <div id="shiftNotice" class="hidden items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border">
+                <svg id="shiftIcon" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    </svg>
+                <span id="shiftText"></span>
+            </div>
+          </div>
+
+          <div class="mt-6 text-sm text-gray-500 dark:text-gray-400 space-y-2 bg-white/30 dark:bg-gray-800/30 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+            <p class="font-semibold text-gray-700 dark:text-gray-200">Hướng dẫn quét mã:</p>
+            <ul class="list-disc list-inside space-y-1 pl-2">
+                <li>Mở ứng dụng <strong>Zalo</strong> và chọn biểu tượng mã QR.</li>
+                <li>Hoặc sử dụng <strong>Camera</strong> mặc định của điện thoại.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="hidden md:block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4/5 w-px bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+      </div>
+    </div>
+
+    <div class="text-center text-xs text-gray-500 dark:text-gray-400 mt-6">© <span id="year"></span> – Bin Bin Hotel. All rights reserved</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrious/dist/qrious.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // (Toàn bộ JavaScript bên trong <script> này được giữ nguyên)
+      // ... (Phần code QRious)
+      const checkinUrl = "{{ base_url }}/attendance/checkin?token={{ qr_token }}";
+      const qr = new QRious({ element: document.getElementById('qrcode'), value: checkinUrl, size: 220 });
+
+      // ... (Phần code pollCheckin)
+      const statusText = document.getElementById('status-text');
+      const statusDot = document.getElementById('status-dot');
+      async function pollCheckin() {
+        try {
+          const res = await fetch(`/attendance/checkin_status?token={{ qr_token }}&t=` + Date.now(), { credentials: 'same-origin' });
+          const data = await res.json();
+          if (data.checked_in) {
+            statusText.textContent = 'Đã điểm danh, đang chuyển trang…';
+            statusDot.innerHTML = '<span class="inline-flex size-2.5 rounded-full bg-green-500"></span><span>Thành công</span>';
+            if (data.redirect_to) {
+              window.location.href = data.redirect_to;
+            } else {
+              window.location.href = '/choose-function';
+            }
+          } else {
+            setTimeout(pollCheckin, 2500);
+          }
+        } catch {
+          statusText.textContent = 'Mạng chập chờn, thử lại sau…';
+          setTimeout(pollCheckin, 3500);
+        }
+      }
+      pollCheckin();
+
+      // ... (Phần code shift notice)
+      const shiftNoticeEl = document.getElementById('shiftNotice');
+      const shiftIconEl = document.getElementById('shiftIcon');
+      const shiftTextEl = document.getElementById('shiftText');
+      const now = new Date();
+      const currentHour = now.getHours();
+      let workDate = new Date(now);
+      let shiftType = '';
+      let noticeClass = '';
+      let iconPath = '';
+      if (currentHour < 7) {
+          workDate.setDate(now.getDate() - 1);
+          shiftType = 'Ca đêm';
+          noticeClass = 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-800';
+          iconPath = '<path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />';
+      } else if (currentHour >= 7 && currentHour < 19) {
+          shiftType = 'Ca ngày';
+          noticeClass = 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border-green-200 dark:border-green-800';
+          iconPath = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />';
+      } else {
+          shiftType = 'Ca đêm';
+          noticeClass = 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-800';
+          iconPath = '<path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />';
+      }
+      const day = String(workDate.getDate()).padStart(2, '0');
+      const month = String(workDate.getMonth() + 1).padStart(2, '0');
+      const workDateStr = `${day}/${month}/${workDate.getFullYear()}`;
+      shiftIconEl.innerHTML = iconPath;
+      shiftTextEl.innerHTML = `${shiftType} <span class="font-normal opacity-80">(${workDateStr})</span>`;
+      shiftNoticeEl.className += ` ${noticeClass}`;
+      shiftNoticeEl.classList.remove('hidden');
+      shiftNoticeEl.classList.add('inline-flex');
+
+      // ... (Phần code theme toggle)
+      const root = document.documentElement;
+      const THEME_KEY = 'theme-mode';
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      function applyTheme(mode){
+        if (mode === 'dark' || (mode === 'system' && prefersDark)) {
+          root.classList.add('dark');
+          document.getElementById('icon-sun').classList.remove('hidden');
+          document.getElementById('icon-moon').classList.add('hidden');
+        } else {
+          root.classList.remove('dark');
+          document.getElementById('icon-sun').classList.add('hidden');
+          document.getElementById('icon-moon').classList.remove('hidden');
+        }
+      }
+      const saved = localStorage.getItem(THEME_KEY) || 'system';
+      applyTheme(saved);
+      document.getElementById('btn-theme').addEventListener('click', () => {
+        const current = localStorage.getItem(THEME_KEY) || 'system';
+        const next = current === 'dark' ? 'light' : current === 'light' ? 'system' : 'dark';
+        localStorage.setItem(THEME_KEY, next);
+        applyTheme(next);
+      });
+
+      // ... (Phần code set year)
+      document.getElementById('year').textContent = new Date().getFullYear();
+    });
+  </script>
+</body>
+<script>
+  // (Toàn bộ JavaScript bên ngoài <script> này được giữ nguyên)
+  function checkAndLogoutForShiftChange() {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const isMorningLogout = (hours === 6 && minutes === 59);
+      const isEveningLogout = (hours === 18 && minutes === 59);
+      if (isMorningLogout || isEveningLogout) {
+          console.log("Đã đến giờ chuyển ca, tự động đăng xuất...");
+          window.location.href = '/logout';
+      }
+  }
+  setInterval(checkAndLogoutForShiftChange, 30000);
+</script>
+</html>

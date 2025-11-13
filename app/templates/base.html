@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="vi" class="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{% block title %}Admin Dashboard{% endblock %} - Bin Bin Hotel</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        :root {
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        html { 
+            font-family: 'Inter', sans-serif; 
+            scroll-behavior: smooth;
+        }
+        [x-cloak] { display: none !important; }
+        
+        .focus-ring {
+            transition-property: box-shadow;
+            transition-duration: 150ms;
+        }
+        .focus-ring:focus-visible { 
+            outline: none;
+            box-shadow: 0 0 0 3px theme('colors.primary.400' / 0.4); 
+        }
+        .no-scrollbar { scrollbar-width: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+    <script>
+        // Cấu hình Tailwind
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            '50': '#eff6ff', '100': '#dbeafe', '200': '#bfdbfe', '300': '#93c5fd',
+                            '400': '#60a5fa', '500': '#3b82f6', '600': '#2563eb', '700': '#1d4ed8',
+                            '800': '#1e40af', '900': '#1e3a8a', '950': '#172554'
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="//unpkg.com/alpinejs" defer></script>
+</head>
+
+<body class="bg-slate-200/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased" 
+      x-data="{ sidebarOpen: false, sidebarCollapsed: window.innerWidth < 1024 }">
+    
+    {% set nav_link_base = "flex items-center px-3 py-2.5 text-sm rounded-lg group transition-all duration-200 ease-in-out focus-ring" %}
+    {% set nav_link_inactive = "text-slate-700 dark:text-slate-300 hover:bg-primary-50 dark:hover:bg-slate-800 hover:text-primary-700 dark:hover:text-primary-300" %}
+    {% set nav_link_active = "font-semibold text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-slate-800 border-l-[3px] border-primary-500" %}
+
+    {% set icon_base = "w-5 h-5 flex-shrink-0 transition-all duration-200 ease-in-out" %}
+    {% set icon_inactive = "text-slate-500 group-hover:text-primary-600 dark:group-hover:text-primary-300" %}
+    {% set icon_active = "text-primary-600 dark:text-primary-300" %}
+
+    {% set span_base = "transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap" %}
+    
+    <div class="flex h-screen p-4 gap-2">
+        
+        <aside
+            class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col flex-shrink-0 rounded-2xl h-full transition-all duration-300 ease-in-out z-40 
+                   md:static md:translate-x-0"
+            :class="{
+                'fixed inset-y-4 left-4 translate-x-0': sidebarOpen, 
+                'fixed inset-y-4 left-4 -translate-x-full': !sidebarOpen,
+                'md:w-56': !sidebarCollapsed, 
+                'md:w-20': sidebarCollapsed
+            }">
+            
+            <div class="flex items-center h-16 border-b dark:border-slate-800 flex-shrink-0 px-4 overflow-hidden"
+                 :class="{'justify-center': sidebarCollapsed, 'justify-start': !sidebarCollapsed}">
+                <a href="/choose-function" class="flex items-center">
+                    <img src="/static/logo.png" alt="Logo Bin Bin Hotel" class="h-8 w-8 flex-shrink-0">
+                    <span class="font-semibold text-lg text-slate-800 dark:text-white {{ span_base }}"
+                          :class="{'ml-3 opacity-100 max-w-xs': !sidebarCollapsed, 'ml-0 opacity-0 max-w-0': sidebarCollapsed}">
+                        Bin Bin Hotel
+                    </span>
+                </a>
+            </div>
+
+            <nav class="flex-1 px-2 py-4 space-y-2 overflow-y-auto overflow-x-hidden no-scrollbar">
+                
+                <a href="/choose-function" 
+                   class="{{ nav_link_base }} {% if active_page == 'dashboard' %}{{ nav_link_active }}{% else %}{{ nav_link_inactive }}{% endif %}"
+                   :class="{'justify-center': sidebarCollapsed}">
+                    <svg class="{{ icon_base }} {% if active_page == 'dashboard' %}{{ icon_active }}{% else %}{{ icon_inactive }}{% endif %}"
+                         :class="{'mr-3': !sidebarCollapsed, 'mr-0': sidebarCollapsed}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                    <span class="{{ span_base }}" :class="{'ml-3 opacity-100 max-w-xs': !sidebarCollapsed, 'ml-0 opacity-0 max-w-0': sidebarCollapsed}">
+                        Chức năng
+                    </span>
+                </a>
+
+                <a href="/tasks"
+                   class="{{ nav_link_base }} {% if active_page == 'tasks' %}{{ nav_link_active }}{% else %}{{ nav_link_inactive }}{% endif %}"
+                   :class="{'justify-center': sidebarCollapsed}">
+                    <svg class="{{ icon_base }} {% if active_page == 'tasks' %}{{ icon_active }}{% else %}{{ icon_inactive }}{% endif %}"
+                         :class="{'mr-3': !sidebarCollapsed, 'mr-0': sidebarCollapsed}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                    <span class="{{ span_base }}" :class="{'ml-3 opacity-100 max-w-xs': !sidebarCollapsed, 'ml-0 opacity-0 max-w-0': sidebarCollapsed}">
+                        Công việc
+                    </span>
+                </a>
+                
+                <a href="/lost-and-found"
+                   class="{{ nav_link_base }} {% if active_page == 'lost-and-found' %}{{ nav_link_active }}{% else %}{{ nav_link_inactive }}{% endif %}"
+                   :class="{'justify-center': sidebarCollapsed}">
+                    <svg class="{{ icon_base }} {% if active_page == 'lost-and-found' %}{{ icon_active }}{% else %}{{ icon_inactive }}{% endif %}"
+                         :class="{'mr-3': !sidebarCollapsed, 'mr-0': sidebarCollapsed}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                         <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                    </svg>
+                    <span class="{{ span_base }}" :class="{'ml-3 opacity-100 max-w-xs': !sidebarCollapsed, 'ml-0 opacity-0 max-w-0': sidebarCollapsed}">
+                        Đồ thất lạc
+                    </span>
+                </a>
+
+                <a href="/attendance/results"
+                   class="{{ nav_link_base }} {% if active_page == 'attendance-results' %}{{ nav_link_active }}{% else %}{{ nav_link_inactive }}{% endif %}"
+                   :class="{'justify-center': sidebarCollapsed}">
+                    <svg class="{{ icon_base }} {% if active_page == 'attendance-results' %}{{ icon_active }}{% else %}{{ icon_inactive }}{% endif %}"
+                         :class="{'mr-3': !sidebarCollapsed, 'mr-0': sidebarCollapsed}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span class="{{ span_base }}" :class="{'ml-3 opacity-100 max-w-xs': !sidebarCollapsed, 'ml-0 opacity-0 max-w-0': sidebarCollapsed}">
+                        Lịch sử Điểm danh
+                    </span>
+                </a>
+
+                <a href="/attendance/calendar-view"
+                   class="{{ nav_link_base }} {% if active_page == 'attendance-calendar' %}{{ nav_link_active }}{% else %}{{ nav_link_inactive }}{% endif %}"
+                   :class="{'justify-center': sidebarCollapsed}">
+                    <svg class="{{ icon_base }} {% if active_page == 'attendance-calendar' %}{{ icon_active }}{% else %}{{ icon_inactive }}{% endif %}"
+                         :class="{'mr-3': !sidebarCollapsed, 'mr-0': sidebarCollapsed}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                         <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span class="{{ span_base }}" :class="{'ml-3 opacity-100 max-w-xs': !sidebarCollapsed, 'ml-0 opacity-0 max-w-0': sidebarCollapsed}">
+                        Lịch Chấm Công
+                    </span>
+                </a>
+
+                {% if user and user.role == 'letan' %}
+                <a href="/service"
+                   class="{{ nav_link_base }} {% if active_page == 'service' %}{{ nav_link_active }}{% else %}{{ nav_link_inactive }}{% endif %}"
+                   :class="{'justify-center': sidebarCollapsed}">
+                    <svg class="{{ icon_base }} {% if active_page == 'service' %}{{ icon_active }}{% else %}{{ icon_inactive }}{% endif %}"
+                         :class="{'mr-3': !sidebarCollapsed, 'mr-0': sidebarCollapsed}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-7 0H3m4 0h5M9 7h1m-1 4h1m-1 4h1m5-4h1m-1 4h1m-1-4h1m-1-4h1" />
+                    </svg>
+                    <span class="{{ span_base }}" :class="{'ml-3 opacity-100 max-w-xs': !sidebarCollapsed, 'ml-0 opacity-0 max-w-0': sidebarCollapsed}">
+                        Chấm Dịch Vụ
+                    </span>
+                </a>
+                {% endif %}
+
+                <a href="{{ url_for('shift_report_page') }}"
+                    class="{{ nav_link_base }} {% if active_page == 'shift-report' %}{{ nav_link_active }}{% else %}{{ nav_link_inactive }}{% endif %}"
+                    :class="{'justify-center': sidebarCollapsed}">
+                    <svg class="{{ icon_base }} {% if active_page == 'shift-report' %}{{ icon_active }}{% else %}{{ icon_inactive }}{% endif %}"
+                        :class="{'mr-3': !sidebarCollapsed, 'mr-0': sidebarCollapsed}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                    <span class="{{ span_base }}" :class="{'ml-3 opacity-100 max-w-xs': !sidebarCollapsed, 'ml-0 opacity-0 max-w-0': sidebarCollapsed}">
+                        Giao Ca
+                    </span>
+                </a>
+            </nav>
+
+            <div class="p-2 mt-auto border-t dark:border-slate-800">
+                </div>
+        </aside>
+
+        <div x-show="sidebarOpen" @click="sidebarOpen = false" 
+             x-transition:enter="transition-opacity ease-linear duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition-opacity ease-linear duration-300"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm md:hidden" x-cloak
+             aria-hidden="true"></div>
+
+        <div class="flex-1 flex flex-col overflow-hidden gap-4">
+            
+            <header class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg shadow-sm z-20 border dark:border-slate-800 rounded-2xl sticky top-2 pt-[var(--safe-top)]">
+                <div class="px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
+                    
+                    <div class="flex items-center gap-3">
+                        <button @click="sidebarOpen = !sidebarOpen" class="md:hidden text-slate-600 dark:text-slate-300 focus-ring rounded"
+                                aria-label="Mở menu" :aria-expanded="sidebarOpen.toString()">
+                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                        </button>
+                        
+                        <button @click="sidebarCollapsed = !sidebarCollapsed" 
+                                class="hidden md:block p-1.5 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 focus-ring"
+                                aria-label="Thu gọn hoặc mở rộng menu">
+                            <svg class="w-5 h-5 transition-transform duration-300 ease-in-out" :class="{'rotate-180': sidebarCollapsed}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+
+                        <h1 class="text-xl font-semibold text-slate-800 dark:text-slate-100 hidden md:block">
+                            {% block page_title %}Chức năng{% endblock %}
+                        </h1>
+                    </div>
+
+                    <div class="flex items-center gap-2 sm:gap-4">
+                        <button id="theme-toggle" type="button" aria-label="Chuyển chế độ Sáng/Tối" class="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 focus-ring transition-all duration-150">
+                            <div class="relative w-5 h-5">
+                                <!-- Icon mặt trăng (cho chế độ tối) -->
+                                <svg id="theme-toggle-dark-icon" class="absolute inset-0 w-full h-full transition-all duration-300 ease-in-out" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+                                </svg>
+                                <!-- Icon mặt trời (cho chế độ sáng) -->
+                                <svg id="theme-toggle-light-icon" class="absolute inset-0 w-full h-full transition-all duration-300 ease-in-out" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+                                </svg>
+                            </div>
+                        </button>
+                        
+                        <div class="relative" x-data="{ userMenuOpen: false }">
+                            <button @click="userMenuOpen = !userMenuOpen" 
+                                    class="flex items-center gap-2 text-sm font-medium rounded-full focus-ring"
+                                    aria-haspopup="true" :aria-expanded="userMenuOpen.toString()">
+                                <span class="hidden sm:inline text-slate-700 dark:text-slate-300">{{ user.name or 'User' }}</span>
+                                <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-semibold">
+                                    {{ (user.name or 'U')[0] | upper }}
+                                </span>
+                            </button>
+                            
+                            <div x-show="userMenuOpen" @click.outside="userMenuOpen = false"
+                                 x-transition:enter="transition ease-out duration-100"
+                                 x-transition:enter-start="opacity-0 scale-95"
+                                 x-transition:enter-end="opacity-100 scale-100"
+                                 x-transition:leave="transition ease-in duration-75"
+                                 x-transition:leave-start="opacity-100 scale-100"
+                                 x-transition:leave-end="opacity-0 scale-95"
+                                 class="absolute right-0 mt-2 w-48 origin-top-right rounded-md shadow-lg bg-white dark:bg-slate-800 ring-1 ring-black ring-opacity-5 focus:outline-none py-1"
+                                 role="menu" aria-orientation="vertical" x-cloak>
+                                <a href="/logout" onclick="return confirm('Bạn có chắc muốn đăng xuất?')" 
+                                   class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-150"
+                                   role="menuitem">
+                                    Đăng xuất
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <main class="flex-1 overflow-y-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm pb-[calc(1.5rem+var(--safe-bottom))]">
+                {% block content %}
+                <p>Welcome to the dashboard.</p>
+                {% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+    <script>
+        // Theme Toggle Logic
+        (function() {
+            const themeToggleBtn = document.getElementById('theme-toggle');
+            const darkIcon = document.getElementById('theme-toggle-dark-icon');
+            const lightIcon = document.getElementById('theme-toggle-light-icon');
+            const htmlElement = document.documentElement;
+
+            const applyTheme = (theme) => {
+                if (theme === 'dark') {
+                    htmlElement.classList.add('dark');
+                    darkIcon.classList.add('opacity-0', 'rotate-90');
+                    lightIcon.classList.remove('opacity-0', '-rotate-90');
+                } else {
+                    htmlElement.classList.remove('dark');
+                    darkIcon.classList.remove('opacity-0', 'rotate-90');
+                    lightIcon.classList.add('opacity-0', '-rotate-90');
+                }
+            };
+
+            const storedTheme = localStorage.getItem('theme');
+            const preferredTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            const currentTheme = storedTheme || preferredTheme;
+            
+            applyTheme(currentTheme);
+
+            themeToggleBtn.addEventListener('click', () => {
+                const newTheme = htmlElement.classList.contains('dark') ? 'light' : 'dark';
+                localStorage.setItem('theme', newTheme);
+                applyTheme(newTheme);
+                window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: newTheme } }));
+            });
+        })();
+
+        // Make user object available globally
+        const currentUser = JSON.parse('{{ user | tojson | safe }}');
+    </script>
+
+    {% block scripts %}
+    {% endblock %}
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mã QR không hợp lệ</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f3f4f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            text-align: center;
+            background: white;
+            padding: 2rem 3rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .icon {
+            font-size: 3rem;
+            color: #ef4444; /* red-500 */
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 1rem;
+            color: #1f2937;
+        }
+        p {
+            margin-top: 0.5rem;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">
+            &#x26A0;&#xFE0F; <!-- Warning Sign -->
+        </div>
+        <h1>Mã QR không hợp lệ</h1>
+        <p>{{ message }}</p>
+    </div>
+</body>
+</html>

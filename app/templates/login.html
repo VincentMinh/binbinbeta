@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Đăng Nhập Hệ Thống</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2563eb',
+            accent: '#111827'
+          }
+        }
+      }
+    }
+  </script>
+ <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100dvh;
+      width: 100%;
+      overscroll-behavior: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    /* ... (Các keyframes và media queries cũ của bạn giữ nguyên) ... */
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fade-in 0.4s ease-out;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+    .animate-shake {
+      animation: shake 0.4s ease;
+    }
+    @keyframes login-success {
+      from { opacity: 1; transform: scale(1); }
+      to { opacity: 0; transform: scale(1.1); }
+    }
+    .animate-login-success {
+      animation: login-success 0.8s ease forwards;
+    }
+    #loginBox {
+      width: 100%;
+      max-width: 420px;
+      margin: auto;
+      box-sizing: border-box;
+    }
+    @media (max-height: 500px) {
+      #loginBox {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+      }
+    }
+    @media screen and (orientation: landscape) and (max-height: 420px) {
+      html, body {
+        padding: 1rem !important;
+        align-items: center;
+      }
+      #loginBox {
+        padding: 1rem !important;
+        max-width: 95%;
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(15px);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        border-radius: 20px;
+      }
+      #loginBox:hover {
+        transform: scale(1.03);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      }
+    }
+
+    /* === BẮT ĐẦU CSS BACKGROUND MỚI === */
+    
+    /* 1. Nền cho Light Mode: (ĐÃ THAY ĐỔI)
+       Nền "Aurora" động với các màu sáng.
+    */
+    body::after {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100dvh;
+      z-index: -2; /* Đặt sau cùng */
+      
+      /* Hiện mặc định (ở light mode) */
+      opacity: 0.4; /* Bạn có thể chỉnh độ mờ này (vd: 0.3, 0.5) */
+      transition: opacity 0.3s ease;
+
+      /* Các màu Aurora cho chế độ sáng (Xanh da trời & Cam nhạt) */
+      background: 
+        radial-gradient(circle at 10% 20%, #87ceeb 0%, transparent 40%), /* Sky Blue */
+        radial-gradient(circle at 80% 70%, #fdbb74 0%, transparent 40%); /* Soft Orange */
+      
+      filter: blur(120px);
+      
+      /* Sử dụng chung animation */
+      animation: aurora-move 20s infinite linear alternate;
+    }
+
+    /* 2. Nền cho Dark Mode: "Aurora" (Giữ nguyên)
+       Sử dụng '::before' để tạo các khối màu mờ.
+    */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100dvh;
+      z-index: -1; /* Đặt sau nội dung, trước nền '::after' */
+      
+      /* Ẩn ở light mode */
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      
+      /* Tạo 2 khối màu mờ bằng radial-gradient (Màu tối) */
+      background: 
+        radial-gradient(circle at 10% 20%, #805ad5 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, #2563eb 0%, transparent 40%);
+      
+      filter: blur(120px); /* Lớp mờ ảo chính */
+      
+      /* Animation chuyển động */
+      animation: aurora-move 20s infinite linear alternate;
+    }
+    
+    /* Khi ở dark mode: ẨN aurora sáng, HIỆN aurora tối */
+    .dark body::before {
+      opacity: 0.3; /* HIỆN aurora tối (::before) */
+    }
+    .dark body::after {
+      opacity: 0; /* ẨN aurora sáng (::after) */
+    }
+
+    /* Keyframes cho animation "Aurora" (Giữ nguyên) */
+    @keyframes aurora-move {
+      from {
+        transform: translate(-20vw, -20vh) rotate(0deg);
+      }
+      to {
+        transform: translate(20vw, 20vh) rotate(180deg);
+      }
+    }
+
+    /* === KẾT THÚC CSS BACKGROUND MỚI === */
+</style>
+
+</head>
+
+<body class="h-[100dvh] flex items-center justify-center px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] bg-slate-100 dark:bg-[#18192a] text-gray-800 dark:text-gray-100 relative overflow-hidden isolation-isolate">
+
+  <div id="loginBox" class="relative w-full max-w-sm sm:max-w-lg p-5 sm:p-6 rounded-2xl bg-white/80 dark:bg-[#23243a]/80 backdrop-blur-xl rounded-3xl shadow-2xl p-6 flex flex-col justify-between min-h-[260px] hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)] transition-shadow duration-200 z-10">
+
+    <div class="absolute top-3 right-3 z-10">
+      <button id="toggleDark" title="Chuyển chế độ tối/sáng" class="p-2 rounded-full bg-white/80 dark:bg-[#23243a]/80 hover:bg-blue-100 dark:hover:bg-indigo-900 transition">
+        <svg id="themeIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600 dark:text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 3v1m0 16v1m8.66-11.66l-.7.7M4.34 6.34l-.7.7M21 12h-1M4 12H3m16.66 4.66l-.7-.7M6.34 17.66l-.7-.7M12 5a7 7 0 100 14 7 7 0 000-14z" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="text-center mb-4">
+      <img src="/static/logo.png" alt="Logo" class="mx-auto h-10 mb-2">
+      <h1 class="text-xl font-semibold">Đăng Nhập Hệ Thống</h1>
+    </div>
+
+    {% if error %}
+    <div class="mb-3 text-xs text-red-500 font-medium bg-red-100 dark:bg-red-900 dark:text-red-300 py-1.5 px-3 rounded animate-shake text-center">
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/login" class="space-y-4 text-sm">
+      <div>
+        <label for="username" class="block font-medium mb-1">Mã nhân viên</label>
+        <div class="relative">
+          <input type:="text" id="username" name="username" required
+            class="w-full pl-10 pr-3 py-1.5 border border-gray-300 dark:border-[#35377b]/40 bg-white/80 dark:bg-[#23243a]/80 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-400 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+            placeholder="Nhập mã nhân viên" />
+          <div class="absolute left-3 top-2.5 text-gray-400 dark:text-gray-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M5.121 17.804A9.003 9.003 0 0012 21a9.003 9.003 0 006.879-3.196M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label for="password" class="block font-medium mb-1">Mật khẩu</label>
+        <div class="relative">
+          <input type="password" id="password" name="password" required
+            class="w-full pl-10 pr-10 py-1.5 
+                  bg-white/80 dark:bg-[#23243a]/80 
+                  border border-gray-300 dark:border-[#35377b]/40 
+                  text-gray-900 dark:text-gray-100 
+                  rounded-md 
+                  placeholder:text-gray-400 dark:placeholder:text-gray-500 
+                  focus:ring-2 focus:ring-blue-400 
+                  focus:bg-white/80 dark:focus:bg-[#23243a]/80"
+            placeholder="Nhập mật khẩu" />
+          <div class="absolute left-3 top-2.5 text-gray-400 dark:text-gray-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 11c0-1.105.895-2 2-2h.586a1 1 0 01.707.293l2.414 2.414a1 1 0 010 1.414l-2.414 2.414A1 1 0 0114.586 16H14a2 2 0 01-2-2v-3z" />
+            </svg>
+          </div>
+          <button type="button" id="togglePassword" class="absolute right-3 top-2.5 text-gray-400 dark:text-gray-300 hover:text-gray-600">
+            <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit"
+        class="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-blue-600 hover:to-green-600 text-white font-semibold py-1.5 rounded-md transition shadow-md">
+        Đăng nhập
+      </button>
+
+      <div class="text-center">
+        <button type="button" onclick="alert('Vui lòng liên hệ quản lý để đặt lại mật khẩu.')"
+          class="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+          Quên mật khẩu?
+        </button>
+      </div>
+    </form>
+
+    <p class="mt-4 text-xs text-center text-gray-400 dark:text-gray-400 italic">
+      &copy; {{ now.year if now else "2025" }} Bin Bin Hotel. All rights reserved.
+    </p>
+  </div>
+
+  <script>
+    const togglePassword = document.getElementById("togglePassword");
+    const passwordInput = document.getElementById("password");
+    const eyeIcon = document.getElementById("eyeIcon");
+    togglePassword.addEventListener("click", () => {
+      const isHidden = passwordInput.type === "password";
+      passwordInput.type = isHidden ? "text" : "password";
+      eyeIcon.innerHTML = isHidden
+        ? `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+             d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.964 9.964 0 012.185-3.412M15 12a3 3 0 00-4.243-2.829M3 3l18 18" />`
+        : `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+             d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+             d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />`;
+    });
+
+    const toggleDark = document.getElementById("toggleDark");
+    const html = document.documentElement;
+    if (localStorage.theme === "dark") html.classList.add("dark");
+    toggleDark.addEventListener("click", () => {
+      html.classList.toggle("dark");
+      localStorage.theme = html.classList.contains("dark") ? "dark" : "light";
+    });
+
+    // Xoá lỗi khỏi URL nếu có
+    if (window.location.search.includes("error=")) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("error");
+      url.searchParams.delete("role");
+      window.history.replaceState({}, document.title, url.pathname);
+    }
+
+    // 👉 Hiệu ứng đăng nhập thành công
+    if (window.location.search.includes("success=1")) {
+      const loginBox = document.getElementById("loginBox");
+      loginBox.classList.add("animate-login-success");
+
+      // Đợi animation (0.8s) hoàn tất rồi chuyển trang
+      setTimeout(() => {
+          window.location.href = "/choose-function";
+      }, 800);
+    }
+  </script>
+
+</body>
+</html>

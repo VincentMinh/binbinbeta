@@ -1,0 +1,1783 @@
+{% extends "base.html" %}
+{% block title %}Quản lý Đồ thất lạc - Bin Bin Hotel{% endblock %}
+{% set active_page = active_page or 'lost-and-found' %}
+{% block page_title %}Đồ Khách Để Quên{% endblock %}
+{% block content %}
+
+<!-- BƯỚC 1: "Bơm" dữ liệu vào một thẻ script an toàn -->
+<script id="initial-data" type="application/json">
+    {{ initial_records | tojson | safe }}
+</script>
+
+<!-- Thêm Chart.js và plugin -->
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+{% endblock %}
+
+<style>
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    .animate-fadeInUp {
+        animation: fadeInUp 0.5s ease-out forwards;
+    }
+</style>
+
+<!-- BƯỚC 2: Sửa đổi x-data để chỉ truyền ID của thẻ script -->
+<div class="p-4 sm:p-6 lg:p-8" x-data="lostAndFound(
+         '#initial-data', 
+         {{ total_records }}, 
+         {{ current_page }}, 
+         {{ total_pages }}
+     )">
+
+    <!-- ================================================================== -->
+    <!-- ======================= DASHBOARD SECTION ======================== -->
+    <!-- ================================================================== -->
+    <div id="dashboardSection" class="w-full mb-6 animate-fadeInUp">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Tổng quan</h2>
+            <div class="flex items-center gap-2">
+                <label for="dashboard-days-filter" class="text-sm font-medium text-slate-600 dark:text-slate-300">Thời gian:</label>
+                <select id="dashboard-days-filter" @change="fetchDashboardStats($event.target.value)" class="block rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-1.5 pl-3 pr-8 text-sm">
+                    <option value="7">7 ngày qua</option>
+                    <option value="30" selected>30 ngày qua</option>
+                    <option value="90">90 ngày qua</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            <!-- Stat Cards -->
+            <template x-for="stat in dashboardStats.cards" :key="stat.label">
+                <div class="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col justify-center items-center shadow-sm hover:shadow-md transition-all duration-300 ease-out hover:scale-[1.03]">
+                    <div class="text-3xl font-bold" :class="stat.color" x-text="stat.value">0</div>
+                    <div class="text-sm text-slate-600 dark:text-slate-300 mt-2" x-text="stat.label"></div>
+                </div>
+            </template>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Line Chart -->
+            <div class="lg:col-span-2 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-4">
+                <h3 class="text-base font-semibold text-slate-700 dark:text-slate-200 mb-4">Số lượng đồ thất lạc theo ngày</h3>
+                <div class="h-64">
+                    <canvas id="dailyItemsChart"></canvas>
+                </div>
+            </div>
+            <!-- Pie Chart -->
+            <div class="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-4">
+                <h3 class="text-base font-semibold text-slate-700 dark:text-slate-200 mb-4">Phân loại theo trạng thái</h3>
+                <div class="h-64 flex items-center justify-center">
+                    <canvas id="statusPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- ======================= END DASHBOARD ========================== -->
+    <!-- ================================================================== -->
+
+    <div class="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm mb-6">
+        <div class="p-4">
+            <div id="search-filters" class="space-y-4">
+                <!-- Hàng 1: Các ô nhập liệu và select box -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <!-- Bộ lọc ngày -->
+                    <div>
+                        <input type="text" id="found_date" placeholder="Chọn ngày phát hiện..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    </div>
+
+                    <!-- Bộ lọc chi nhánh (nếu có quyền) -->
+                    {% if user.role in ['quanly', 'admin', 'boss'] %}
+                    <div>
+                        <select id="chi_nhanh" @change="currentPage = 1; fetchData()" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            <option value="" selected>Tất cả chi nhánh</option>
+                            {% for b in branches %}<option value="{{ b }}" {% if b == branch_filter %}selected{% endif %}>{{ b }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+
+                    <!-- Bộ lọc trạng thái -->
+                    <div>
+                        <select id="status" @change="currentPage = 1; fetchData()" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            <option value="">Tất cả trạng thái</option>
+                            {% for s in statuses %}<option value="{{ s.value }}" {% if s.value == status_filter %}selected{% endif %}>{{ status_display_map.get(s.value, s.value) }}</option>{% endfor %}
+                            {% if user.role in ['admin', 'boss'] %}<option value="DELETED" class="text-rose-600 font-medium">Đã xoá</option>{% endif %}
+                        </select>
+                    </div>
+
+                    <!-- Ô tìm kiếm (chiếm nhiều không gian hơn) -->
+                    <div class="lg:col-span-2">
+                        <input type="search" id="search" @keydown.enter.prevent="document.getElementById('apply-filters').click()" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="Tên đồ, nơi phát hiện, khách...">
+                    </div>
+                </div>
+                <!-- Hàng 2: Các nút hành động -->
+                <div class="flex flex-wrap justify-between items-center gap-4 pt-2">
+                    <!-- Các nút lọc và xóa -->
+                    <div class="flex items-center gap-3">
+                        <button id="apply-filters" @click="currentPage = 1; fetchData()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-md flex items-center gap-2 font-semibold transition text-sm">Áp dụng</button>
+                        <button id="clear-filters" class="bg-slate-200 hover:bg-slate-300 dark:bg-slate-600 dark:hover:bg-slate-500 text-slate-800 dark:text-slate-100 px-5 py-2 rounded-lg flex items-center gap-2 font-medium transition text-sm">Xóa bộ lọc</button>
+                    </div>
+                    <!-- Các nút chức năng -->
+                    <div class="flex items-center gap-3">
+                        <button @click="openAddModal()" class="bg-gradient-to-r from-green-500 to-blue-500 hover:from-blue-600 hover:to-green-600 text-white px-5 py-2 rounded-lg shadow-md flex items-center gap-2 font-semibold transition text-sm">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                            <span>Thêm Mới</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-4 flex flex-col sm:flex-row justify-between items-center gap-4 transition-all duration-300">
+        <div class="flex items-center gap-4">
+            {% if user.role in ['letan', 'quanly', 'admin', 'boss'] %}
+            <button id="delete-selected-btn" @click="batchDelete" x-show="selectedIds.length > 0" class="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition font-semibold text-sm flex items-center gap-2 shadow-sm hover:shadow-md active:scale-95" x-cloak>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                Xóa (<span x-text="selectedIds.length"></span>) mục
+            </button>
+            {% endif %}
+            <div class="flex items-center gap-2">
+                <label for="per-page-select" class="text-sm font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">Hiển thị:</label>
+                <select id="per-page-select" @change="changePerPage($event.target.value)" x-model="recordsPerPage" class="block rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 pl-3 pr-8 text-sm">
+                    <option value="9">9</option>
+                    <option value="18">18</option>
+                    <option value="36">36</option>
+                    <option value="54">54</option>
+                </select>
+            </div>
+            <p id="record-count" class="text-sm text-slate-500 dark:text-slate-400 font-medium"></p>
+        </div>
+        <div id="pagination-container" class="w-full sm:w-auto flex justify-center items-center mt-4 sm:mt-0">
+            <div id="pagination-controls" class="flex justify-center items-center gap-1"></div>
+        </div>
+    </div>
+
+    <div class="w-full bg-white dark:bg-slate-900/70 overflow-hidden rounded-2xl shadow-md border border-slate-200 dark:border-slate-800 transition-all duration-300 mb-6 hidden lg:block">
+        <div class="overflow-auto max-h-[65vh]">
+            <table class="w-full text-sm text-left text-slate-500 dark:text-slate-400 border-collapse">
+                <thead class="sticky top-0 z-10 text-xs text-slate-700 uppercase dark:text-slate-400 bg-gradient-to-b from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-700 border-b border-slate-200 dark:border-slate-700">
+                    <tr>
+                        {% if user.role in ['letan', 'quanly', 'admin', 'boss'] %}
+                        <th scope="col" class="w-12 px-4 py-3 text-center">
+                            <input type="checkbox" id="select-all-checkbox" @click="toggleSelectAll" 
+                                   :checked="selectedIds.length > 0 && selectedIds.length === records.length"
+                                   class="h-4 w-4 rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 bg-white dark:bg-slate-700">
+                        </th>
+                        {% endif %}
+                        {% if user.role in ['quanly', 'admin', 'boss'] %}
+                        <th scope="col" class="w-32 px-4 py-3 text-left"> 
+                            Chi nhánh
+                        </th>
+                        {% endif %}
+                        <th scope="col" class="px-4 py-3 text-left"> 
+                            Tên món đồ
+                        </th>
+                        <th scope="col" class="w-44 px-4 py-3 text-left"> 
+                            Ngày phát hiện
+                        </th>
+                        <th scope="col" class="w-36 px-4 py-3 text-left"> 
+                            Nơi phát hiện
+                        </th>
+                        <th scope="col" class="w-40 px-4 py-3 text-left"> 
+                            Tên Khách Hàng
+                        </th>
+                        <th scope="col" class="w-40 px-4 py-3 text-left"> 
+                            Thông tin liên hệ
+                        </th>
+                        <th scope="col" class="w-36 px-4 py-3 text-center"> 
+                            Trạng thái
+                        </th>
+                        <th scope="col" class="w-28 px-4 py-3 text-center">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-if="loading">
+                        <tr>
+                            <td :colspan="canDelete ? (userRole === 'letan' ? 8 : 9) : (userRole === 'letan' ? 7 : 8)" class="text-center py-16">
+                                <p class="text-slate-500 dark:text-slate-400">Đang tải dữ liệu...</p>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="records.length === 0 && !loading">
+                        <tr>
+                            <td :colspan="canDelete ? (userRole === 'letan' ? 8 : 9) : (userRole === 'letan' ? 7 : 8)" 
+                                class="text-center py-16 text-slate-500 dark:text-slate-400">
+                                Không tìm thấy món đồ nào.
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-for="item in records" :key="item.id">
+                        <tr @click='openDetailsModal(item)' 
+                            class="bg-white border-b dark:bg-slate-900 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors duration-150 cursor-pointer"
+                            :class="{ 'opacity-60': item.status.includes('Đã xoá') }">
+                            
+                            <td x-show="canDelete" class="px-4 py-3 text-center" @click.stop>
+                                <input type="checkbox" @click="handleCheckboxClick($event, item.id)" :checked="selectedIds.includes(item.id)" 
+                                       class="row-checkbox h-4 w-4 rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 bg-white dark:bg-slate-700 pointer-events-auto">
+                            </td>
+                            
+                            <td x-show="userRole === 'quanly' || userRole === 'admin' || userRole === 'boss'" 
+                                class="px-4 py-3 text-left" x-text="item.chi_nhanh || ''"></td>
+                            
+                            <td class="px-4 py-3 text-left font-medium text-slate-800 dark:text-slate-200" 
+                                x-text="item.item_name"></td>
+                                
+                            <td class="px-4 py-3 text-left" x-text="formatDate(item.found_datetime)"></td>
+                            
+                            <td class="px-4 py-3 text-left" x-text="item.found_location"></td>
+                            
+                            <td class="px-4 py-3 text-left" x-text="item.owner_name || 'Chưa có'"></td>
+                            
+                            <td class="px-4 py-3 text-left" x-text="item.owner_contact || 'Chưa có'"></td>
+                            
+                            <td class="px-4 py-3 text-center">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                                      :class="getStatusInfo(item.status).badge" 
+                                      x-text="item.status"></span>
+                            </td>
+                            
+                            <td class="px-4 py-3 text-center" @click.stop>
+                                <div class="flex justify-center items-center gap-2">
+                                    <button x-show="item.status === 'Đang lưu giữ'" @click.stop='openReturnModal(item)' title="Trả khách" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg></button>
+                                    <button x-show="item.status === 'Có thể thanh lý'" @click.stop='openDisposeModal(item)' title="Thanh lý" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg></button>
+                                    <button x-show="hasEditPermission && !item.status.includes('Đã xoá')" @click='openEditModal(item)' title="Sửa" class="text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300 transition"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"></path></svg></button>
+                                    <button x-show="canDelete && !item.status.includes('Đã xoá')" @click="deleteItem(item.id, false)" title="Xóa" class="text-rose-600 hover:text-rose-800 dark:text-rose-400 dark:hover:text-rose-300 transition"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg></button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="error" class="hidden text-center py-16 bg-rose-100 text-rose-700 rounded-lg"><p>Có lỗi xảy ra khi tải dữ liệu.</p></div>
+
+    <div class="block lg:hidden w-full scroll-smooth space-y-4">
+        <template x-if="loading">
+             <div class="text-center py-16 text-slate-500 dark:text-slate-400">Đang tải dữ liệu...</div>
+        </template>
+        <template x-if="records.length === 0 && !loading">
+            <div class="text-center py-16 text-slate-500 dark:text-slate-400">
+                Không tìm thấy món đồ nào.
+            </div>
+        </template>
+        <template x-for="item in records" :key="item.id">
+            <div @click='openDetailsModal(item)' 
+                 class="relative overflow-hidden rounded-2xl shadow-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                 :class="{ 'opacity-60': item.status.includes('Đã xoá') }">
+                <div class="p-4 flex flex-col gap-2">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1 pr-4">
+                            <div class="font-semibold text-slate-800 dark:text-slate-100" x-text="item.item_name"></div>
+                            <div x-show="userRole !== 'letan' && item.chi_nhanh" 
+                                 class="text-xs text-slate-500 dark:text-slate-400 mt-1" 
+                                 x-text="item.chi_nhanh"></div>
+                        </div>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                              :class="getStatusInfo(item.status).badge"
+                              x-text="item.status"></span>
+                    </div>
+                    <div class="text-sm text-slate-600 dark:text-slate-300">
+                        <p><strong>Nơi phát hiện:</strong> <span x-text="item.found_location"></span></p>
+                        <p><strong>Tên khách:</strong> <span x-text="item.owner_name || 'Chưa có'"></span></p>
+                        <p><strong>Liên hệ:</strong> <span x-text="item.owner_contact || 'Chưa có'"></span></p>
+                    </div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700 mt-2"
+                         x-text="formatDate(item.found_datetime)">
+                    </div>
+                    <div class="absolute top-3 right-3 flex flex-col gap-2">
+                        <button x-show="item.status === 'Đang lưu giữ'" @click.stop='openReturnModal(item)' title="Trả khách" class="p-1.5 rounded-full bg-slate-100 dark:bg-slate-700 text-blue-600 dark:text-blue-400 hover:bg-slate-200 dark:hover:bg-slate-600 transition"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg></button>
+                        <button x-show="item.status === 'Có thể thanh lý'" @click.stop='openDisposeModal(item)' title="Thanh lý" class="p-1.5 rounded-full bg-slate-100 dark:bg-slate-700 text-blue-600 dark:text-blue-400 hover:bg-slate-200 dark:hover:bg-slate-600 transition"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg></button>
+                        <button x-show="hasEditPermission && !item.status.includes('Đã xoá')" @click.stop='openEditModal(item)' title="Sửa" class="p-1.5 rounded-full bg-slate-100 dark:bg-slate-700 text-yellow-600 dark:text-yellow-400 hover:bg-slate-200 dark:hover:bg-slate-600 transition"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"></path></svg></button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+    
+    <div x-show="isAddModalOpen" 
+         @keydown.escape.window="closeAddModal()" 
+         class="modal fixed inset-0 z-50 flex items-center justify-center p-4" 
+         x-cloak>
+        <!-- Backdrop -->
+        <div x-show="isAddModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-black/40 backdrop-blur-sm"></div>
+    
+        <!-- Modal Content -->
+        <div @click.outside="closeAddModal()" 
+             x-show="isAddModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+             class="relative w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+                <div class="flex items-center gap-3">
+                    <div class="grid place-items-center w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50">
+                            <svg class="w-5 h-5 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                        </svg>
+                    </div>
+                    <h2 class="text-lg font-semibold text-slate-800 dark:text-white">Ghi nhận đồ thất lạc</h2>
+                </div>
+                <button @click="closeAddModal()" class="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+    
+            <form id="add-item-form" @submit.prevent="submitAddItemForm" class="p-5 space-y-4 overflow-y-auto">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {% if user.role in ['quanly', 'admin', 'boss'] %}
+                    <div class="sm:col-span-2">
+                        <label for="add_chi_nhanh" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Chi nhánh <span class="text-rose-500">*</span></label>
+                        <select id="add_chi_nhanh" name="chi_nhanh" required class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            <option value="" disabled selected>Chọn chi nhánh</option>
+                            {% for b in branches %}
+                            <option value="{{ b }}">{{ b }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+
+                    <div x-show="userRole === 'admin' || userRole === 'boss'" class="relative sm:col-span-2">
+                        <label for="add_recorded_by" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Người tạo</label>
+                        <input type="text" id="add_recorded_by_search" placeholder="Mặc định là bạn, hoặc tìm người khác..." autocomplete="off"
+                               @input.debounce.300ms="searchRecorders($event.target.value)"
+                               @focus="searchRecorders($event.target.value)"
+                               class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <input type="hidden" id="add_recorded_by" name="recorded_by">
+                        <div x-show="recorderSuggestions.length > 0" @click.outside="recorderSuggestions = []"
+                             class="absolute z-20 mt-1 w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-lg max-h-48 overflow-auto">
+                            <template x-for="recorder in recorderSuggestions" :key="recorder.code">
+                                <div @click="selectRecorder(recorder)" class="cursor-pointer select-none relative py-2 px-3 text-slate-900 dark:text-slate-200 hover:bg-blue-500 hover:text-white" x-text="`${recorder.name} (${recorder.code})`"></div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="add_item_name" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Tên món đồ <span class="text-rose-500">*</span></label>
+                        <input type="text" id="add_item_name" name="item_name" required placeholder="VD: Ví da màu đen, điện thoại iPhone 15..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    </div>
+    
+                    <div>
+                        <label for="add_found_location" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Nơi phát hiện <span class="text-rose-500">*</span></label>
+                        <input type="text" id="add_found_location" name="found_location" required placeholder="VD: Phòng 201, Lobby..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    </div>
+    
+                    <div class="relative">
+                        <label for="add_reported_by" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Người phát hiện <span class="text-rose-500">*</span></label>
+                        <input type="text" id="add_reported_by_search" placeholder="Tìm tên nhân viên..." autocomplete="off"
+                               @input.debounce.300ms="document.getElementById('add_reported_by').value = ''; searchReporters($event.target.value)"
+                               @focus="searchReporters($event.target.value)"
+                               class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <input type="hidden" id="add_reported_by" name="reported_by" required>
+                        <div x-show="reporterSuggestions.length > 0" @click.outside="reporterSuggestions = []"
+                             class="absolute z-20 mt-1 w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-lg max-h-48 overflow-auto">
+                            <template x-for="reporter in reporterSuggestions" :key="reporter.code">
+                                <div @click="selectReporter(reporter)" class="cursor-pointer select-none relative py-2 px-3 text-slate-900 dark:text-slate-200 hover:bg-blue-500 hover:text-white" x-text="`${reporter.name} (${reporter.code})`"></div>
+                            </template>
+                        </div>
+                    </div>
+    
+                    <div class="sm:col-span-2">
+                        <label for="add_description" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Mô tả chi tiết</label>
+                        <textarea id="add_description" name="description" rows="2" placeholder="Đặc điểm nhận dạng, tình trạng món đồ..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></textarea>
+                    </div>
+    
+                    <div class="sm:col-span-2">
+                        <label for="add_notes" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Ghi chú</label>
+                        <textarea id="add_notes" name="notes" rows="2" placeholder="VD: Mức thưởng, tình trạng đặc biệt..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></textarea>
+                    </div>
+    
+                    <fieldset class="sm:col-span-2 border-t border-slate-200 dark:border-slate-700 pt-4 space-y-4">
+                        <legend class="text-sm font-medium text-slate-500 dark:text-slate-400">Thông tin khách hàng</legend>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="add_owner_name" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Tên khách hàng <span class="text-rose-500">*</span></label>
+                                <input type="text" id="add_owner_name" name="owner_name" required placeholder="Nhập tên khách hàng" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            </div>
+                            <div>
+                                <label for="add_owner_contact" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Thông tin liên hệ <span class="text-rose-500">*</span></label>
+                                <input type="text" id="add_owner_contact" name="owner_contact" required placeholder="SĐT, CCCD,..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            </div>
+                        </div>
+                    </fieldset>
+                </div>
+            </form>
+    
+            <div class="p-5 border-t border-slate-200 dark:border-slate-700 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                <button type="button" @click="closeAddModal()" class="px-5 py-2.5 text-center text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">Hủy</button>
+                <button type="submit" form="add-item-form" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-lg shadow-blue-500/20">Lưu lại</button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="isEditModalOpen" 
+         @keydown.escape.window="closeEditModal()" 
+         class="modal fixed inset-0 z-[10001] flex items-center justify-center p-4" 
+         x-cloak>
+        <!-- Backdrop -->
+        <div x-show="isEditModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-black/40 backdrop-blur-sm"></div>
+    
+        <!-- Modal Content -->
+        <div @click.outside="closeEditModal()" 
+             x-show="isEditModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+             class="relative w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+                <div class="flex items-center gap-3">
+                    <div class="grid place-items-center w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/50">
+                            <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-lg font-semibold text-slate-800 dark:text-white">Chỉnh sửa đồ thất lạc</h2>
+                </div>
+                <button @click="closeEditModal()" class="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+    
+            <form id="edit-item-form" @submit.prevent="submitEditForm()" x-bind:action="'/lost-and-found/edit-details/' + editItem.id" class="p-5 space-y-4 overflow-y-auto">
+                <input type="hidden" name="item_id" x-model="editItem.id">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {% if user.role in ['quanly', 'admin', 'boss'] %}
+                    <div class="sm:col-span-2">
+                        <label for="edit_chi_nhanh" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Chi nhánh <span class="text-rose-500">*</span></label>
+                        <select id="edit_chi_nhanh" name="chi_nhanh" x-model="editItem.chi_nhanh" required class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            <option value="" disabled>Chọn chi nhánh</option>
+                            {% for b in branches %}
+                            <option value="{{ b }}">{{ b }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+
+                    <div x-show="userRole === 'admin' || userRole === 'boss'" class="relative sm:col-span-2">
+                        <label for="edit_recorded_by_search" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Người ghi nhận</label>
+                        <input type="text" id="edit_recorded_by_search" placeholder="Tìm người ghi nhận..." autocomplete="off"
+                               @input.debounce.300ms="searchRecorders($event.target.value, 'edit')"
+                               @focus="searchRecorders($event.target.value, 'edit')"
+                               class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <input type="hidden" id="edit_recorded_by" name="recorded_by" x-model="editItem.recorded_by">
+                        <div x-show="recorderSuggestions.length > 0" @click.outside="recorderSuggestions = []"
+                             class="absolute z-20 mt-1 w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-lg max-h-48 overflow-auto">
+                            <template x-for="recorder in recorderSuggestions" :key="recorder.code">
+                                <div @click="selectRecorder(recorder, 'edit')" class="cursor-pointer select-none relative py-2 px-3 text-slate-900 dark:text-slate-200 hover:bg-blue-500 hover:text-white" x-text="`${recorder.name} (${recorder.code})`"></div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="edit_item_name" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Tên món đồ <span class="text-rose-500">*</span></label>
+                        <input type="text" id="edit_item_name" name="item_name" x-model="editItem.item_name" required placeholder="VD: Ví da màu đen, điện thoại iPhone 15..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    </div>
+    
+                    <div>
+                        <label for="edit_found_location" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Nơi phát hiện <span class="text-rose-500">*</span></label>
+                        <input type="text" id="edit_found_location" name="found_location" x-model="editItem.found_location" required placeholder="VD: Phòng 201, Lobby..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                    </div>
+    
+                    <div class="relative">
+                        <label for="edit_reported_by_search" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Người phát hiện <span class="text-rose-500">*</span></label>
+                        <input type="text" id="edit_reported_by_search" placeholder="Tìm tên nhân viên..." autocomplete="off"
+                               @input.debounce.300ms="searchReporters($event.target.value, 'edit')"
+                               @focus="searchReporters($event.target.value, 'edit')"
+                               class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        <input type="hidden" id="edit_reported_by" name="reported_by" x-model="editItem.reported_by" required>
+                        <div x-show="reporterSuggestions.length > 0" @click.outside="reporterSuggestions = []"
+                             class="absolute z-20 mt-1 w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-lg max-h-48 overflow-auto">
+                            <template x-for="reporter in reporterSuggestions" :key="reporter.code">
+                                <div @click="selectReporter(reporter, 'edit')" class="cursor-pointer select-none relative py-2 px-3 text-slate-900 dark:text-slate-200 hover:bg-blue-500 hover:text-white" x-text="`${reporter.name} (${reporter.code})`"></div>
+                            </template>
+                        </div>
+                    </div>
+    
+                    <div class="sm:col-span-2">
+                        <label for="edit_description" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Mô tả chi tiết</label>
+                        <textarea id="edit_description" name="description" x-model="editItem.description" rows="2" placeholder="Đặc điểm nhận dạng, tình trạng món đồ..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></textarea>
+                    </div>
+    
+                    <div class="sm:col-span-2">
+                        <label for="edit_notes" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Ghi chú</label>
+                        <textarea id="edit_notes" name="notes" x-model="editItem.notes" rows="2" placeholder="VD: Mức thưởng, tình trạng đặc biệt..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></textarea>
+                    </div>
+    
+                    <fieldset class="sm:col-span-2 border-t border-slate-200 dark:border-slate-700 pt-4 space-y-4">
+                        <legend class="text-sm font-medium text-slate-500 dark:text-slate-400">Thông tin khách hàng</legend>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="edit_owner_name" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Tên khách hàng <span class="text-rose-500">*</span></label>
+                                <input type="text" id="edit_owner_name" name="owner_name" x-model="editItem.owner_name" required placeholder="Nhập tên khách hàng" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            </div>
+                            <div>
+                                <label for="edit_owner_contact" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Thông tin liên hệ <span class="text-rose-500">*</span></label>
+                                <input type="text" id="edit_owner_contact" name="owner_contact" x-model="editItem.owner_contact" required placeholder="SĐT, CCCD,..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset x-show="editItem.status && editItem.status.includes('Đã trả khách')" class="sm:col-span-2 border-t border-slate-200 dark:border-slate-700 pt-4 space-y-4">
+                        <legend class="text-sm font-medium text-emerald-600 dark:text-emerald-400">Thông tin trả khách</legend>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="edit_receiver_name" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Tên người nhận</label>
+                                <input type="text" id="edit_receiver_name" name="receiver_name" x-model="editItem.receiver_name" placeholder="Tên người nhận đồ" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            </div>
+                            <div>
+                                <label for="edit_receiver_contact" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Liên hệ người nhận</label>
+                                <input type="text" id="edit_receiver_contact" name="receiver_contact" x-model="editItem.receiver_contact" placeholder="SĐT, CCCD..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label for="edit_update_notes_return" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Ghi chú cập nhật (trả khách)</label>
+                                <textarea id="edit_update_notes_return" name="update_notes" x-model="editItem.update_notes" rows="2" placeholder="Ghi chú thêm khi trả khách..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></textarea>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset x-show="editItem.status && editItem.status.includes('Thanh lý')" class="sm:col-span-2 border-t border-slate-200 dark:border-slate-700 pt-4 space-y-4">
+                        <legend class="text-sm font-medium text-slate-500 dark:text-slate-400">Thông tin thanh lý</legend>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                             <div>
+                                <label for="edit_disposed_amount" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Số tiền thanh lý (VNĐ)</label>
+                                <input type="number" id="edit_disposed_amount" name="disposed_amount" x-model="editItem.disposed_amount" placeholder="Nhập số tiền" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label for="edit_update_notes_dispose" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Ghi chú cập nhật (thanh lý)</label>
+                                <textarea id="edit_update_notes_dispose" name="update_notes" x-model="editItem.update_notes" rows="2" placeholder="Ghi chú thêm khi thanh lý..." class="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></textarea>
+                            </div>
+                        </div>
+                    </fieldset>
+                </div>
+            </form>
+    
+            <div class="p-5 border-t border-slate-200 dark:border-slate-700 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                <button type="button" @click="closeEditModal()" class="px-5 py-2.5 text-center text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">Hủy</button>
+                <button type="submit" form="edit-item-form" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-lg shadow-blue-500/20">Lưu thay đổi</button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="isDetailsModalOpen" 
+         @keydown.escape.window="closeDetailsModal()" 
+         class="modal fixed inset-0 z-[10000] flex items-center justify-center p-4" 
+         x-cloak>
+        <!-- Backdrop -->
+        <div x-show="isDetailsModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-black/50 backdrop-blur-sm"></div>
+    
+        <!-- Modal Content -->
+        <div @click.outside="closeDetailsModal()" 
+             x-show="isDetailsModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+             class="relative w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+                <div class="flex items-center gap-4">
+                    <div class="grid place-items-center w-12 h-12 rounded-xl" :class="getStatusInfo(selectedItem.status).iconBg">
+                        <svg class="w-6 h-6" :class="getStatusInfo(selectedItem.status).iconColor" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" x-html="getStatusInfo(selectedItem.status).iconPath"></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800 dark:text-white" x-text="selectedItem.item_name"></h2>
+                        <div class="mt-1.5">
+                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full" :class="getStatusInfo(selectedItem.status).badge" x-text="selectedItem.status"></span>
+                                <span x-show="userRole !== 'letan' && selectedItem.chi_nhanh" class="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h6.375M9 12h6.375M9 17.25h6.375" /></svg>
+                                    <span x-text="selectedItem.chi_nhanh"></span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button @click="closeDetailsModal()" class="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-6 overflow-y-auto">
+                <div class="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
+                    <h4 class="font-semibold text-blue-800 dark:text-blue-200 mb-2">Thông tin khách hàng</h4>
+                    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                        <div><dt class="font-medium text-blue-700 dark:text-blue-300">Tên khách hàng</dt><dd class="mt-1 text-slate-800 dark:text-slate-200" x-text="selectedItem.owner_name || 'Chưa có'"></dd></div>
+                        <div><dt class="font-medium text-blue-700 dark:text-blue-300">Thông tin liên hệ</dt><dd class="mt-1 text-slate-800 dark:text-slate-200" x-text="selectedItem.owner_contact || 'Chưa có'"></dd></div>
+                    </dl>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700">
+                        <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Mô tả</p>
+                        <p class="mt-1 text-base text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words" x-text="selectedItem.description || 'Không có'"></p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700">
+                        <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Ghi chú ban đầu</p>
+                        <p class="mt-1 text-base text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words" x-text="selectedItem.notes || 'Không có'"></p>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <h3 class="text-base font-semibold text-slate-800 dark:text-white">Lịch sử món đồ</h3>
+                    <ol class="relative border-l border-slate-200 dark:border-slate-600 space-y-6">
+                        <li class="ml-6">
+                            <span class="absolute flex items-center justify-center w-6 h-6 bg-blue-100 rounded-full -left-3 ring-8 ring-white dark:ring-slate-800 dark:bg-blue-900">
+                                <svg class="w-3 h-3 text-blue-800 dark:text-blue-300" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>
+                            </span>
+                            <h4 class="flex items-center mb-1 text-base font-semibold text-slate-900 dark:text-white">Phát hiện</h4>
+                            <time class="block mb-2 text-sm font-normal leading-none text-slate-400 dark:text-slate-500" x-text="formatDate(selectedItem.found_datetime)"></time>
+                            <div class="space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
+                                <p><strong class="font-medium text-slate-500 dark:text-slate-400">Tại vị trí:</strong> <span x-text="selectedItem.found_location"></span></p>
+                                <p><strong class="font-medium text-slate-500 dark:text-slate-400">Người phát hiện:</strong> <span x-text="selectedItem.reported_by"></span></p>
+                                <p><strong class="font-medium text-slate-500 dark:text-slate-400">Người ghi nhận:</strong> <span x-text="selectedItem.recorded_by"></span></p> 
+                            </div>
+                        </li>
+                        <li class="ml-6" x-show="selectedItem.return_date && selectedItem.receiver_name">
+                            <span class="absolute flex items-center justify-center w-6 h-6 bg-emerald-100 rounded-full -left-3 ring-8 ring-white dark:ring-slate-800 dark:bg-emerald-900">
+                                <svg class="w-3 h-3 text-emerald-800 dark:text-emerald-300" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.052-.143z" clip-rule="evenodd" /></svg>
+                            </span>
+                            <h4 class="mb-1 text-base font-semibold text-slate-900 dark:text-white">Đã trả khách</h4>
+                            <time class="block mb-2 text-sm font-normal leading-none text-slate-400 dark:text-slate-500" x-text="formatDate(selectedItem.return_date)"></time>
+                            <div class="space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
+                                <p><strong class="font-medium text-slate-500 dark:text-slate-400">Người nhận:</strong> <span x-text="selectedItem.receiver_name || 'Không rõ'"></span></p>
+                                <p><strong class="font-medium text-slate-500 dark:text-slate-400">Liên hệ:</strong> <span x-text="selectedItem.receiver_contact || 'Không rõ'"></span></p>
+                                <p x-show="selectedItem.update_notes"><strong class="font-medium text-slate-500 dark:text-slate-400">Ghi chú:</strong> <span class="whitespace-pre-wrap" x-text="selectedItem.update_notes"></span></p>
+                            </div>
+                        </li>
+                        <li class="ml-6" x-show="selectedItem.return_date && selectedItem.disposed_by">
+                            <span class="absolute flex items-center justify-center w-6 h-6 bg-slate-200 rounded-full -left-3 ring-8 ring-white dark:ring-slate-800 dark:bg-slate-600">
+                                <svg class="w-3 h-3 text-slate-800 dark:text-slate-300" fill="currentColor" viewBox="0 0 20 20"><path d="M3.25 4.25a.75.75 0 01.75-.75h12a.75.75 0 01.75.75v.5a.75.75 0 01-.75.75H4a.75.75 0 01-.75-.75v-.5zM4.5 6.5a.75.75 0 00-.75.75v9a.75.75 0 00.75.75h11a.75.75 0 00.75-.75v-9a.75.75 0 00-.75-.75h-11z" /></svg>
+                            </span>
+                            <h4 class="mb-1 text-base font-semibold text-slate-900 dark:text-white">Thanh lý</h4>
+                            <time class="block mb-2 text-sm font-normal leading-none text-slate-400 dark:text-slate-500" x-text="formatDate(selectedItem.return_date)"></time>
+                            <div class="space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
+                                <p><strong class="font-medium text-slate-500 dark:text-slate-400">Người thực hiện:</strong> <span x-text="selectedItem.disposed_by"></span></p>
+                                <p><strong class="font-medium text-slate-500 dark:text-slate-400">Số tiền:</strong> <span x-text="selectedItem.disposed_amount ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(selectedItem.disposed_amount) : 'Không có'"></span></p>
+                                <p x-show="selectedItem.update_notes"><strong class="font-medium text-slate-500 dark:text-slate-400">Ghi chú:</strong> <span class="whitespace-pre-wrap" x-text="selectedItem.update_notes"></span></p>
+                            </div>
+                        </li>
+                        <li class="ml-6" x-show="selectedItem.deleted_datetime">
+                            <span class="absolute flex items-center justify-center w-6 h-6 bg-rose-100 rounded-full -left-3 ring-8 ring-white dark:ring-slate-800 dark:bg-rose-900">
+                                <svg class="w-3 h-3 text-rose-800 dark:text-rose-300" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.58.22-2.365.468a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" /></svg>
+                            </span>
+                            <h4 class="mb-1 text-base font-semibold text-slate-900 dark:text-white">Đã xóa</h4>
+                            <time class="block mb-2 text-sm font-normal leading-none text-slate-400 dark:text-slate-500" x-text="formatDate(selectedItem.deleted_datetime)"></time>
+                            <div class="space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
+                                <p><strong class="font-medium text-slate-500 dark:text-slate-400">Người xóa:</strong> <span x-text="selectedItem.deleted_by"></span></p>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+
+            </div>
+
+            <div class="p-5 border-t border-slate-200 dark:border-slate-700 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                <template x-if="canDelete && selectedItem.status && !selectedItem.status.includes('Đã xoá')">
+                    <button type="button" @click="deleteItem(selectedItem.id, false)" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                        <span>Xóa</span>
+                    </button>
+                </template>
+
+                <template x-if="canEdit">
+                    <div class="flex-grow flex flex-col sm:flex-row justify-end gap-3">
+                        <button x-show="selectedItem.status === 'Đang lưu giữ'" @click="openReturnModal()" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
+                            <span>Trả khách</span>
+                        </button>
+                        <button x-show="selectedItem.status === 'Có thể thanh lý'" @click="openDisposeModal()" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
+                            <span>Thanh lý</span>
+                        </button>
+                    </div>
+                </template>
+
+                <template x-if="userRole === 'admin' || userRole === 'boss'">
+                    <button type="button" @click="deleteItem(selectedItem.id, true)" x-show="selectedItem.status && selectedItem.status.includes('Đã xoá')" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-white bg-rose-600 rounded-xl hover:bg-rose-700 active:bg-rose-800 transition-colors shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                        <span>Xóa Vĩnh Viễn</span>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="isReturnModalOpen" 
+         @keydown.escape.window="closeReturnModal()" 
+         class="modal fixed inset-0 z-[10001] flex items-center justify-center p-4" 
+         x-cloak>
+        <!-- Backdrop -->
+        <div x-show="isReturnModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-black/40 backdrop-blur-sm"></div>
+    
+        <!-- Modal Content -->
+        <div @click.outside="closeReturnModal()" 
+             x-show="isReturnModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+             class="relative w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+                <h2 class="text-lg font-semibold text-slate-800 dark:text-white">Trả đồ cho khách</h2>
+                <button @click="closeReturnModal()" class="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <form id="return-item-form" @submit.prevent="submitUpdateForm('return')" class="p-5 space-y-4 overflow-y-auto">
+                <div class="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input type="text" name="owner_name" placeholder="Tên khách nhận" :value="selectedItem.owner_name || ''" required class="w-full py-2 px-3 rounded-lg border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm">
+                    <input type="text" name="owner_contact" placeholder="SĐT/CCCD khách" :value="selectedItem.owner_contact || ''" required class="w-full py-2 px-3 rounded-lg border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm">
+                </div>
+                <div>
+                    <label for="return_notes" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Ghi chú cập nhật</label>
+                    <textarea id="return_notes" name="notes" rows="2" class="w-full py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></textarea>
+                </div>
+            </form>
+            <div class="p-5 border-t border-slate-200 dark:border-slate-700 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                <button type="button" @click="closeReturnModal()" class="px-5 py-2.5 text-center text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">Hủy</button>
+                <button type="submit" form="return-item-form" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-lg shadow-blue-500/20">Xác nhận trả khách</button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="isDisposeModalOpen" 
+         @keydown.escape.window="closeDisposeModal()" 
+         class="modal fixed inset-0 z-[10001] flex items-center justify-center p-4" 
+         x-cloak>
+        <!-- Backdrop -->
+        <div x-show="isDisposeModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-black/40 backdrop-blur-sm"></div>
+    
+        <!-- Modal Content -->
+        <div @click.outside="closeDisposeModal()" 
+             x-show="isDisposeModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+             class="relative w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+                <h2 class="text-lg font-semibold text-slate-800 dark:text-white">Thanh lý đồ thất lạc</h2>
+                <button @click="closeDisposeModal()" class="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <form id="dispose-item-form" @submit.prevent="submitUpdateForm('dispose')" class="p-5 space-y-4 overflow-y-auto">
+                <div class="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="relative">
+                        <input type="text" id="dispose_disposed_by_search" placeholder="Tìm người thanh lý..." autocomplete="off" required
+                               @input.debounce.300ms="document.getElementById('dispose_disposed_by').value = ''; searchDisposers($event.target.value)"
+                               @focus="searchDisposers($event.target.value)"
+                               class="w-full py-2 px-3 rounded-lg border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm">
+                        <input type="hidden" id="dispose_disposed_by" name="disposed_by">
+                        <div x-show="disposerSuggestions.length > 0" @click.outside="disposerSuggestions = []"
+                             class="absolute z-20 mt-1 w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-lg max-h-48 overflow-auto">
+                            <template x-for="disposer in disposerSuggestions" :key="disposer.code">
+                                <div @click="selectDisposer(disposer, 'dispose')" class="cursor-pointer select-none relative py-2 px-3 text-slate-900 dark:text-slate-200 hover:bg-blue-500 hover:text-white" x-text="`${disposer.name} (${disposer.code})`"></div>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="relative">
+                        <input type="text" x-model="formattedDisposedAmount" @input="handleAmountInput($event)" inputmode="numeric" placeholder="Số tiền" required class="w-full py-2 pl-3 pr-12 rounded-lg border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm text-right">
+                        <span class="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-gray-500 dark:text-slate-400 pointer-events-none">VNĐ</span>
+                        <input type="hidden" name="disposed_amount" :value="getRawAmount()">
+                    </div>
+                </div>
+                <div>
+                    <label for="dispose_notes" class="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Ghi chú cập nhật</label>
+                    <textarea id="dispose_notes" name="notes" rows="2" class="w-full py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></textarea>
+                </div>
+            </form>
+            <div class="p-5 border-t border-slate-200 dark:border-slate-700 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                <button type="button" @click="closeDisposeModal()" class="px-5 py-2.5 text-center text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">Hủy</button>
+                <button type="submit" form="dispose-item-form" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-lg shadow-blue-500/20">Xác nhận thanh lý</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+    function lostAndFound(initialDataSelector, totalRecords, currentPage, totalPages) {
+        return {
+            // Modal states
+            isAddModalOpen: false,
+            isDetailsModalOpen: false, 
+            isEditModalOpen: false, 
+            editItem: {}, 
+            isReturnModalOpen: false,
+            isDisposeModalOpen: false, 
+
+            // Data states
+            selectedItem: {},
+            selectedIds: [],
+            lastCheckedId: null, // SỬA: Thêm state cho Shift+Click
+            totalPages: totalPages,
+
+            formattedDisposedAmount: '',
+            updateAction: 'return',
+            userRole: '{{ user.role }}',
+            reporterSuggestions: [],
+            recorderSuggestions: [],
+            disposerSuggestions: [],
+            filterReporterSuggestions: [],
+            user: JSON.parse('{{ user | tojson | safe }}'),
+            canDelete: ['letan', 'quanly', 'admin', 'boss'].includes('{{ user.role }}'),
+            displayBranch: '',
+            hasEditPermission: ['letan', 'quanly', 'admin', 'boss'].includes('{{ user.role }}'),
+            
+            // SỬA: Khởi tạo mảng records
+            // BƯỚC 3: Đọc dữ liệu từ thẻ script thay vì parse chuỗi trực tiếp
+            records: [],
+            totalRecords: 0,
+            
+            // State cho dashboard
+            dashboardStats: { cards: [], daily: { labels: [], data: [] }, status: {} },
+            dailyChart: null,
+            pieChart: null,
+
+            // Các biến được truyền vào
+            initialDataSelector: initialDataSelector,
+            initialTotalRecords: totalRecords,
+            currentPage: currentPage,
+            recordsPerPage: parseInt(localStorage.getItem('lostAndFoundPerPage')) || 9,
+            
+            // SỬA: Di chuyển các element vào state
+            loading: false, // Thay thế loadingEl bằng một biến boolean
+            errorEl: null,
+            // noResultsEl: null, // Không cần nữa
+            recordCountEl: null,
+
+            // Helper: Lấy thông tin trạng thái (Giữ nguyên)
+            getStatusInfo(status) {
+                if (!status) {
+                    return { badge: '', iconBg: '', iconColor: '', iconPath: '' };
+                }
+                 const statusMap = {
+                    'Đang lưu giữ': { badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300', iconBg: 'bg-amber-100 dark:bg-amber-900/50', iconColor: 'text-amber-600 dark:text-amber-300', iconPath: '<path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />' },
+                    'Có thể thanh lý': { badge: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-300', iconBg: 'bg-cyan-100 dark:bg-cyan-900/50', iconColor: 'text-cyan-600 dark:text-cyan-300', iconPath: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />' },
+                    'Đã trả khách': { badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300', iconBg: 'bg-emerald-100 dark:bg-emerald-900/50', iconColor: 'text-emerald-600 dark:text-emerald-300', iconPath: '<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />' },
+                    'Thanh lý': { badge: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300', iconBg: 'bg-slate-100 dark:bg-slate-700', iconColor: 'text-slate-600 dark:text-slate-300', iconPath: '<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h6.375M9 12h6.375M9 17.25h6.375" />' },
+                    'Đã xoá': { badge: 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300', iconBg: 'bg-rose-100 dark:bg-rose-900/50', iconColor: 'text-rose-600 dark:text-rose-300', iconPath: '<path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />' },
+                };
+                const effectiveStatus = status.includes('Đã xoá') ? 'Đã xoá' : status;
+                return statusMap[effectiveStatus] || statusMap['Đang lưu giữ'];
+            },
+ 
+            // Helper: Quyền chỉnh sửa (Giữ nguyên)
+            get canEdit() {
+                if (!this.selectedItem || !this.selectedItem.status) return false;
+                return ['Đang lưu giữ', 'Có thể thanh lý', 'Đã trả khách', 'Thanh lý'].includes(this.selectedItem.status);
+            },
+            
+            // Các hàm search (Giữ nguyên)
+            async searchReporters(query, context = 'add') {
+                if (query.trim().length < 2) {
+                    this.reporterSuggestions = [];
+                    return;
+                }
+                try {
+                    const response = await fetch(`/attendance/api/employees/search?q=${encodeURIComponent(query)}&context=reporter_search`);
+                    if (!response.ok) throw new Error('Lỗi khi tìm kiếm');
+                    this.reporterSuggestions = await response.json();
+                } catch (error) {
+                    console.error('Lỗi tìm người phát hiện:', error);
+                    this.reporterSuggestions = [];
+                }
+            },
+            async searchRecorders(query, context = 'add') {
+                if (query.trim().length < 2) {
+                    this.recorderSuggestions = [];
+                    return;
+                }
+                try {
+                    const response = await fetch(`/api/users/search-login-users?q=${encodeURIComponent(query)}&context=${context}`);
+                    if (!response.ok) throw new Error('Lỗi khi tìm kiếm');
+                    this.recorderSuggestions = await response.json();
+                } catch (error) {
+                    console.error('Lỗi tìm người tạo:', error);
+                }
+            },
+            selectRecorder(recorder, context = 'add') {
+                const searchInput = document.getElementById(`${context}_recorded_by_search`);
+                const hiddenInput = document.getElementById(`${context}_recorded_by`);
+                const valueToSet = `${recorder.name} (${recorder.code})`;
+                if (searchInput) searchInput.value = valueToSet;
+                if (hiddenInput) hiddenInput.value = valueToSet;
+                if (context === 'edit') this.editItem.recorded_by = valueToSet;
+                this.recorderSuggestions = [];
+            },
+            async searchDisposers(query) {
+                if (query.trim().length < 2) {
+                    this.disposerSuggestions = [];
+                    return;
+                }
+                try {
+                    const response = await fetch(`/attendance/api/employees/search?q=${encodeURIComponent(query)}&context=all_users_search`);
+                    if (!response.ok) throw new Error('Lỗi khi tìm kiếm');
+                    this.disposerSuggestions = await response.json();
+                } catch (error) {
+                    console.error('Lỗi tìm người thanh lý:', error);
+                    this.disposerSuggestions = [];
+                }
+            },
+            selectDisposer(disposer) {
+                const searchInput = document.getElementById(`dispose_disposed_by_search`);
+                const hiddenInput = document.getElementById(`dispose_disposed_by`);
+                const valueToSet = `${disposer.name} (${disposer.code})`;
+                if (searchInput) searchInput.value = valueToSet;
+                if (hiddenInput) hiddenInput.value = valueToSet;
+                this.disposerSuggestions = [];
+            },
+            async searchFilterReporters(query) {
+                // (Giữ nguyên)
+            },
+            selectFilterReporter(reporter) {
+                // (Giữ nguyên)
+            },
+
+            // ==========================================================
+            // ============ LOGIC LÕI (ĐÃ SỬA) =========================
+            // ==========================================================
+            
+            init() {
+                // Gán các element vào state
+                this.errorEl = document.getElementById('error');
+                this.recordCountEl = document.getElementById('record-count');
+
+                // --- THAY ĐỔI QUAN TRỌNG: Đọc dữ liệu từ thẻ script ---
+                const initialDataElement = document.querySelector(this.initialDataSelector);
+                if (initialDataElement) {
+                    this.records = JSON.parse(initialDataElement.textContent);
+                }
+                this.totalRecords = this.initialTotalRecords;
+                // --- KẾT THÚC THAY ĐỔI ---
+
+                // Gắn listener cho nút clear filter
+                document.querySelector('#clear-filters').addEventListener('click', () => {
+                    document.getElementById('search').value = '';
+                    document.getElementById('status').value = '';
+                    document.getElementById('found_date').value = '';
+                    const chiNhanhEl = document.getElementById('chi_nhanh');
+                    if (chiNhanhEl && this.userRole !== 'letan') chiNhanhEl.value = '';
+                    this.currentPage = 1;
+                    this.fetchData();
+                });
+
+                // Lấy giá trị chi nhánh ban đầu
+                const chiNhanhSelect = document.getElementById('chi_nhanh');
+                if (chiNhanhSelect) {
+                    this.displayBranch = chiNhanhSelect.value;
+                } else {
+                    this.displayBranch = '{{ initial_branch_filter }}';
+                }
+
+                // Gán giá trị perPage từ localStorage
+                const perPageSelect = document.getElementById('per-page-select');
+                perPageSelect.value = this.recordsPerPage;
+
+                // Tải dữ liệu dashboard lần đầu
+                this.fetchDashboardStats();
+                this.$watch('displayBranch', () => this.fetchDashboardStats());
+
+                // --- THAY ĐỔI QUAN TRỌNG ---
+                // Ẩn loading và render pagination với dữ liệu đã có từ server
+                this.renderPagination(this.currentPage, this.totalPages, this.totalRecords, this.records.length);
+            },
+
+            changePerPage(value) {
+                this.recordsPerPage = parseInt(value, 10);
+                // 1. Lưu vào localStorage để AlpineJS đọc lại ngay lập tức
+                localStorage.setItem('lostAndFoundPerPage', this.recordsPerPage);
+                // 2. Lưu vào cookie để server đọc được khi tải lại trang
+                document.cookie = `lostAndFoundPerPage=${this.recordsPerPage};path=/;max-age=31536000;samesite=Lax`; // Lưu trong 1 năm
+                this.currentPage = 1;
+                this.fetchData();
+            },
+
+            // buildQueryString (Giữ nguyên)
+            buildQueryString() {
+                const params = new URLSearchParams();
+                params.append('page', this.currentPage);
+                params.append('per_page', this.recordsPerPage);
+
+                const search = document.getElementById('search').value;
+                const status = document.getElementById('status').value;
+                const chiNhanhEl = document.getElementById('chi_nhanh');
+                const chi_nhanh = chiNhanhEl ? chiNhanhEl.value : '{{ initial_branch_filter }}';
+                const found_date = document.getElementById('found_date').value;
+
+                this.displayBranch = chi_nhanh;
+                
+                if (search) params.append('search', search.trim());
+                if (status) params.append('status', status);
+                if (chi_nhanh) params.append('chi_nhanh', chi_nhanh);
+                if (found_date) params.append('found_date', found_date);
+
+                return params.toString();
+            },
+
+            // fetchData (SỬA)
+            fetchData: async function() {
+                this.loading = true;
+                this.errorEl.classList.add('hidden');
+                this.records = []; // Xóa dữ liệu cũ khi đang tải
+                this.selectedIds = []; // Xóa các mục đã chọn
+
+                try {
+                    const response = await fetch(`/lost-and-found/api?${this.buildQueryString()}`);
+                    if (!response.ok) {
+                        let errorDetail = 'Network response was not ok';
+                        try {
+                            const errorData = await response.json();
+                            errorDetail = errorData.detail || errorData.message || JSON.stringify(errorData);
+                        } catch (e) { /* Bỏ qua */ }
+                        throw new Error(errorDetail);
+                    }
+                    const data = await response.json();
+
+                    // --- SỬA ---
+                    // Chỉ gán dữ liệu vào mảng, Alpine.js sẽ tự động render
+                    this.records = data.records;
+                    this.totalRecords = data.totalRecords; // Cập nhật tổng số
+                    this.totalPages = data.totalPages;
+                    
+                    this.renderPagination(data.currentPage, data.totalPages, data.totalRecords, data.records.length);
+                } catch (err) {
+                    console.error('Fetch error:', err);
+                    this.errorEl.classList.remove('hidden');
+                    this.errorEl.querySelector('p').textContent = `Có lỗi xảy ra: ${err.message}`;
+                } finally {
+                    // Luôn tắt trạng thái loading sau khi fetch xong
+                    this.loading = false;
+                }
+            },
+
+            // ==========================================================
+            // ============ LOGIC DASHBOARD (MỚI) =======================
+            // ==========================================================
+            async fetchDashboardStats(days = 30) {
+                const chiNhanh = this.displayBranch;
+                const params = new URLSearchParams({ days });
+                if (chiNhanh) {
+                    params.append('chi_nhanh', chiNhanh);
+                }
+
+                try {
+                    const response = await fetch(`/lost-and-found/api/dashboard-stats?${params.toString()}`);
+                    if (!response.ok) throw new Error('Lỗi tải dữ liệu dashboard');
+                    const data = await response.json();
+
+                    this.dashboardStats.cards = [
+                        { label: 'Tổng số', value: data.status_stats.total, color: 'text-blue-500' },
+                        { label: 'Đang lưu giữ', value: data.status_stats.STORED, color: 'text-amber-500' },
+                        { label: 'Có thể thanh lý', value: data.status_stats.DISPOSABLE, color: 'text-cyan-500' },
+                        { label: 'Đã trả khách', value: data.status_stats.RETURNED, color: 'text-emerald-500' },
+                        { label: 'Đã thanh lý', value: data.status_stats.DISPOSED, color: 'text-slate-500' },
+                    ];
+
+                    this.renderDailyChart(data.daily_stats);
+                    this.renderPieChart(data.status_stats);
+
+                } catch (error) {
+                    console.error("Lỗi fetch dashboard:", error);
+                }
+            },
+
+            renderDailyChart(dailyData) {
+                const ctx = document.getElementById('dailyItemsChart').getContext('2d');
+                if (this.dailyChart) {
+                    this.dailyChart.destroy();
+                }
+                const isDark = document.documentElement.classList.contains('dark');
+                const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+                const textColor = isDark ? '#cbd5e1' : '#475569';
+
+                this.dailyChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dailyData.labels,
+                        datasets: [{
+                            label: 'Số đồ thất lạc',
+                            data: dailyData.data,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            pointBackgroundColor: '#3b82f6',
+                            pointRadius: 3,
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { color: textColor, stepSize: 1 }, grid: { color: gridColor } },
+                            x: { ticks: { color: textColor }, grid: { display: false } }
+                        },
+                        animation: {
+                            duration: 800, // Thời gian hiệu ứng (ms)
+                            easing: 'easeOutCubic' // Kiểu hiệu ứng
+                        }
+                    }
+                });
+            },
+
+            renderPieChart(statusData) {
+                const ctx = document.getElementById('statusPieChart').getContext('2d');
+                if (this.pieChart) {
+                    this.pieChart.destroy();
+                }
+                this.pieChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Đang lưu giữ', 'Có thể thanh lý', 'Đã trả khách', 'Đã thanh lý'],
+                        datasets: [{
+                            data: [statusData.STORED, statusData.DISPOSABLE, statusData.RETURNED, statusData.DISPOSED],
+                            backgroundColor: ['#f59e0b', '#06b6d4', '#10b981', '#64748b'],
+                            borderColor: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff',
+                            borderWidth: 2,
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: document.documentElement.classList.contains('dark') ? '#cbd5e1' : '#475569' } },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => `${context.label}: ${context.raw}`
+                                }
+                            }
+                        }
+                    }
+                });
+            },
+
+            // --- SỬA: XÓA BỎ HÀM renderTable ---
+            // renderTable(records) { ... }
+
+            // renderPagination (SỬA: Cập nhật text)
+            renderPagination: function(currentPageNum, totalPages, totalRecords, recordsOnPage) {
+                const paginationEl = document.getElementById('pagination-controls');
+                paginationEl.innerHTML = ''; // Xóa pagination cũ
+
+                // Cập nhật text đếm
+                if (totalRecords === 0) {
+                    this.recordCountEl.textContent = 'Không có món đồ nào.';
+                    return;
+                }
+                this.recordCountEl.textContent = `Hiển thị ${recordsOnPage} / ${totalRecords} món đồ.`;
+
+                if (totalPages <= 1) return;
+
+                const createButton = (text, page, isDisabled = false, isCurrent = false) => {
+                    const button = document.createElement('button');
+                    button.innerHTML = text;
+                    button.dataset.page = page;
+                    let baseClasses = 'px-3 py-1 rounded-lg border text-sm font-semibold transition-colors';
+                    if (isCurrent) button.className = `${baseClasses} bg-blue-600 text-white border-blue-600 cursor-default shadow-sm`;
+                    else if (isDisabled) button.className = `${baseClasses} bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 cursor-not-allowed`;
+                    else button.className = `${baseClasses} bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700`;
+                    if (!isDisabled && !isCurrent) button.addEventListener('click', () => { this.currentPage = page; this.fetchData(); });
+                    return button;
+                };
+                
+                // (Giữ nguyên logic tạo nút)
+                paginationEl.appendChild(createButton('&laquo;', 1, currentPageNum === 1));
+                paginationEl.appendChild(createButton('&lsaquo;', currentPageNum - 1, currentPageNum === 1));
+                let startPage = Math.max(1, currentPageNum - 2);
+                let endPage = Math.min(totalPages, currentPageNum + 2);
+                if (currentPageNum <= 3) endPage = Math.min(5, totalPages);
+                if (currentPageNum > totalPages - 3) startPage = Math.max(1, totalPages - 4);
+                if (startPage > 1) {
+                    paginationEl.appendChild(createButton('1', 1));
+                    if (startPage > 2) paginationEl.insertAdjacentHTML('beforeend', `<span class="px-2 text-slate-400">...</span>`);
+                }
+                for (let i = startPage; i <= endPage; i++) {
+                    paginationEl.appendChild(createButton(i, i, false, i === currentPageNum));
+                }
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) paginationEl.insertAdjacentHTML('beforeend', `<span class="px-2 text-slate-400">...</span>`);
+                    paginationEl.appendChild(createButton(totalPages, totalPages));
+                }
+                paginationEl.appendChild(createButton('&rsaquo;', currentPageNum + 1, currentPageNum === totalPages));
+                paginationEl.appendChild(createButton('&raquo;', totalPages, currentPageNum === totalPages));
+            },
+
+            // Các hàm Modal (Giữ nguyên)
+            openAddModal: function() {
+                this.isAddModalOpen = true;
+                this.$nextTick(() => {
+                    const form = document.getElementById('add-item-form');
+                    if (form) form.reset();
+                    const searchInput = document.getElementById('add_reported_by_search');
+                    if (searchInput) searchInput.value = '';
+                    const searchInputRec = document.getElementById('add_recorded_by_search');
+                    if (searchInputRec) searchInputRec.value = '';
+                });
+                this.reporterSuggestions = [];
+                this.recorderSuggestions = [];
+            },
+            closeAddModal: function() { this.isAddModalOpen = false; },
+
+            openEditModal: function(item) {
+                this.editItem = JSON.parse(JSON.stringify(item));
+                this.isEditModalOpen = true;
+                this.$nextTick(() => {
+                    const editReportedBySearch = document.getElementById('edit_reported_by_search');
+                    if (editReportedBySearch && this.editItem.reported_by) {
+                        editReportedBySearch.value = this.editItem.reported_by;
+                    }
+                    const editRecordedBySearch = document.getElementById('edit_recorded_by_search');
+                    if (editRecordedBySearch && this.editItem.recorded_by) {
+                        editRecordedBySearch.value = this.editItem.recorded_by; 
+                    }
+                    this.reporterSuggestions = [];
+                    this.recorderSuggestions = [];
+                });
+            },
+            closeEditModal: function() { this.isEditModalOpen = false; },
+
+            openDetailsModal: function(item) {
+                this.selectedItem = item;
+                this.isDetailsModalOpen = true;
+            },
+            closeDetailsModal: function() { this.isDetailsModalOpen = false; },
+            
+            openReturnModal(item = null) {
+                if (item) this.selectedItem = item;
+                // Sửa: Đóng modal chi tiết trước, sau đó mở modal trả đồ sau một khoảng trễ ngắn
+                // để hiệu ứng chuyển tiếp hoạt động.
+                this.closeDetailsModal();
+                setTimeout(() => {
+                   this.isReturnModalOpen = true;
+                }, 150); // 150ms delay
+            },
+            closeReturnModal() { this.isReturnModalOpen = false; },
+
+            openDisposeModal(item = null) { // Sửa: Tương tự openReturnModal
+                 if (item) this.selectedItem = item;
+                 this.closeDetailsModal();
+                 setTimeout(() => {
+                     this.isDisposeModalOpen = true;
+                     this.$nextTick(() => {
+                         document.getElementById('dispose-item-form').reset();
+                         document.getElementById('dispose_disposed_by_search').value = '';
+                         this.formattedDisposedAmount = '';
+                         this.disposerSuggestions = [];
+                     });
+                 }, 150);
+            },
+            closeDisposeModal() { this.isDisposeModalOpen = false; },
+            
+            // Các hàm helper (Giữ nguyên)
+            handleAmountInput: function(event) {
+                let rawValue = event.target.value.replace(/[^0-9]/g, '');
+                if (rawValue) {
+                    this.formattedDisposedAmount = new Intl.NumberFormat('vi-VN').format(parseInt(rawValue, 10));
+                } else {
+                    this.formattedDisposedAmount = '';
+                }
+            },
+            getRawAmount: function() {
+                if (!this.formattedDisposedAmount) return '';
+                return this.formattedDisposedAmount.replace(/[^0-9]/g, '');
+            },
+            formatDate: function(dateString) {
+                if (!dateString) return 'N/A';
+                const options = { 
+                    day: '2-digit', month: '2-digit', year: 'numeric', 
+                    hour: '2-digit', minute: '2-digit',
+                    timeZone: 'Asia/Ho_Chi_Minh' 
+                };
+                return new Date(dateString).toLocaleString('vi-VN', options);
+            },
+            selectReporter(reporter, context = 'add') {
+                const searchInput = document.getElementById(`${context}_reported_by_search`);
+                const hiddenInput = document.getElementById(`${context}_reported_by`);
+                const valueToSet = `${reporter.name} (${reporter.code})`;
+                if (searchInput) searchInput.value = valueToSet;
+                if (hiddenInput) hiddenInput.value = valueToSet;
+                if (context === 'edit') this.editItem.reported_by = valueToSet;
+                this.reporterSuggestions = [];
+            },
+
+            // --- SỬA: XÓA HÀM updateSortIndicator ---
+            // updateSortIndicator() { ... }
+
+            // toggleSelection (Giữ nguyên)
+            toggleSelection(id) {
+                const index = this.selectedIds.indexOf(id);
+                if (index > -1) {
+                    this.selectedIds.splice(index, 1);
+                } else {
+                    this.selectedIds.push(id);
+                }
+            },
+
+            // toggleSelectAll (SỬA)
+            toggleSelectAll(event) {
+                const isChecked = this.selectedIds.length < this.records.length;
+                // Sửa: Lấy ID từ mảng 'records' thay vì DOM
+                this.selectedIds = isChecked ? this.records.map(r => r.id) : [];
+            },
+
+            // SỬA: Thêm hàm xử lý Shift+Click
+            handleCheckboxClick(event, id) {
+                const isChecked = !this.selectedIds.includes(id); // Trạng thái sắp tới của checkbox
+
+                if (event.shiftKey && this.lastCheckedId !== null && this.lastCheckedId !== id) {
+                    const allRecordIds = this.records.map(r => r.id);
+                    const start = allRecordIds.indexOf(this.lastCheckedId);
+                    const end = allRecordIds.indexOf(id);
+
+                    if (start !== -1 && end !== -1) {
+                        const rangeStart = Math.min(start, end);
+                        const rangeEnd = Math.max(start, end);
+                        const idsToToggle = allRecordIds.slice(rangeStart, rangeEnd + 1);
+
+                        if (isChecked) {
+                            // Thêm tất cả ID trong khoảng vào mảng selectedIds (tránh trùng lặp)
+                            const idsToAdd = idsToToggle.filter(i => !this.selectedIds.includes(i));
+                            this.selectedIds.push(...idsToAdd);
+                        } else {
+                            // Xóa tất cả ID trong khoảng khỏi mảng selectedIds
+                            this.selectedIds = this.selectedIds.filter(selectedId => !idsToToggle.includes(selectedId));
+                        }
+                    }
+                    // Không cập nhật lastCheckedId khi dùng Shift
+                } else {
+                    // Click bình thường
+                    this.toggleSelection(id);
+                    // Cập nhật lastCheckedId
+                    this.lastCheckedId = id;
+                }
+
+                event.target.checked = this.selectedIds.includes(id);
+            },
+
+            // updateDeleteButtonState (SỬA: Xóa bỏ, dùng x-show)
+            // updateDeleteButtonState() { ... }
+            
+            // ==========================================================
+            // ============ CÁC HÀM SUBMIT (ĐÃ SỬA) =====================
+            // ==========================================================
+
+            submitAddItemForm: async function(event) {
+                const submitBtn = event.target.closest('.modal').querySelector('button[type="submit"]');
+                const originalBtnText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = 'Đang lưu...';
+
+                const formData = new FormData(event.target);
+
+                // Validation (Giữ nguyên)
+                const reportedBy = formData.get('reported_by').trim();
+                if (!reportedBy) {
+                    alert('Vui lòng chọn một "Người phát hiện" từ danh sách gợi ý.');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                    return;
+                }
+                const ownerName = formData.get('owner_name').trim();
+                const ownerContact = formData.get('owner_contact').trim();
+                if (!ownerName || !ownerContact) {
+                    alert('Vui lòng nhập đầy đủ Tên khách hàng và Thông tin liên hệ.');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/lost-and-found/add', {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    
+                    const result = await response.json(); // Luôn cố gắng đọc JSON
+                    if (!response.ok) {
+                         throw new Error(result.detail || 'Lỗi server');
+                    }
+
+                    if (result.status === 'success') {
+                        showToast('add');
+                        this.closeAddModal();
+                        
+                        // --- SỬA: INSTANT UI ---
+                        this.records.unshift(result.item); 
+                        this.records = [...this.records]; // Trigger Alpine re-render
+                        this.totalRecords++;
+                        this.renderPagination(this.currentPage, Math.ceil(this.totalRecords / this.recordsPerPage), this.totalRecords, this.records.length);
+                        this.fetchDashboardStats(); // CẬP NHẬT: Tải lại dashboard
+                        // KHÔNG GỌI fetchData()
+                    } else {
+                        alert('Lỗi: ' + (result.message || 'Không nhận được dữ liệu hợp lệ.'));
+                    }
+                } catch (error) {
+                    alert('Lỗi kết nối: ' + error.message);
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                }
+            },
+
+            submitUpdateForm: async function(action) {
+                const confirmMessage = action === 'return' 
+                    ? 'Bạn có chắc chắn muốn xác nhận trả đồ cho khách không?' 
+                    : 'Bạn có chắc chắn muốn xác nhận thanh lý món đồ này không?';
+
+                if (!confirm(confirmMessage)) return;
+
+                const formId = action === 'return' ? 'return-item-form' : 'dispose-item-form';
+                const form = document.getElementById(formId);
+                if (!form) return;
+
+                const submitBtn = document.querySelector(`button[form="${formId}"]`);
+                const originalBtnText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = 'Đang lưu...';
+                
+                const formData = new FormData(form);
+                formData.append('action', action);
+                
+                // Validation (Giữ nguyên)
+                if (action === 'return') {
+                    const ownerName = formData.get('owner_name').trim();
+                    const ownerContact = formData.get('owner_contact').trim();
+                    if (!ownerName || !ownerContact) {
+                        alert('Vui lòng nhập đầy đủ Tên khách nhận và Thông tin liên hệ.');
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnText;
+                        return;
+                    }
+                } else if (action === 'dispose') {
+                    const disposedBy = formData.get('disposed_by').trim();
+                    const disposedAmount = formData.get('disposed_amount');
+                    if (!disposedBy || !disposedAmount) {
+                        alert('Vui lòng chọn "Người thanh lý" từ danh sách và nhập "Số tiền".');
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnText;
+                        return;
+                    }
+                }
+
+
+                try {
+                    const response = await fetch(`/lost-and-found/update/${this.selectedItem.id}`, {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    const result = await response.json(); // Luôn cố gắng đọc JSON
+                    if (!response.ok) {
+                         throw new Error(result.detail || 'Lỗi server');
+                    }
+
+                    if (result.status === 'success') {
+                        if (action === 'return') {
+                            showToast('return');
+                        } else if (action === 'dispose') {
+                            showToast('dispose');
+                        } else {
+                            showToast('update');
+                        }
+                        if (action === 'return') this.closeReturnModal();
+                        if (action === 'dispose') this.closeDisposeModal();
+                        
+                        // --- SỬA: INSTANT UI ---
+                        const index = this.records.findIndex(r => r.id === this.selectedItem.id);
+                        if (index !== -1) {
+                            this.records.splice(index, 1, result.item);
+                            this.records = [...this.records]; // Trigger Alpine re-render
+                        }
+                        this.fetchDashboardStats(); // CẬP NHẬT: Tải lại dashboard
+                        // KHÔNG GỌI fetchData()
+                    } else {
+                        alert('Lỗi: ' + (result.message || 'Không nhận được dữ liệu hợp lệ.'));
+                    }
+                } catch (error) {
+                    alert('Lỗi kết nối: ' + error.message);
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                }
+            },
+
+            submitEditForm: async function() {
+                if (!confirm('Bạn có chắc chắn muốn lưu các thay đổi này không?')) return;
+
+                const form = document.getElementById('edit-item-form');
+                if (!form) return;
+
+                const submitBtn = form.closest('.modal').querySelector('button[type="submit"]');
+                const originalBtnText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = 'Đang lưu...';
+
+                const formData = new FormData(form);
+
+                // Validation (Giữ nguyên)
+                const reportedBy = formData.get('reported_by').trim();
+                if (!reportedBy) {
+                    alert('Vui lòng chọn một "Người phát hiện" từ danh sách gợi ý.');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                    return;
+                }
+                const ownerName = formData.get('owner_name').trim();
+                const ownerContact = formData.get('owner_contact').trim();
+                if (!ownerName || !ownerContact) {
+                    alert('Vui lòng nhập đầy đủ Tên khách hàng và Thông tin liên hệ.');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/lost-and-found/edit-details/${this.editItem.id}`, {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    
+                    const result = await response.json(); // Luôn cố gắng đọc JSON
+                    if (!response.ok) {
+                        let errorMessage = result.detail || 'Lỗi không xác định.';
+                        if (Array.isArray(result.detail)) {
+                             errorMessage = result.detail.map(e => `${e.loc.join(' -> ')}: ${e.msg}`).join('\n');
+                        }
+                        throw new Error(errorMessage);
+                    }
+
+                    if (result.status === 'success') {
+                        showToast('update');
+                        this.closeEditModal();
+
+                        // --- SỬA: INSTANT UI ---
+                        const index = this.records.findIndex(r => r.id === this.editItem.id);
+                        if (index !== -1) {
+                            this.records.splice(index, 1, result.item);
+                            this.records = [...this.records]; // Trigger Alpine re-render
+                        }
+                        this.fetchDashboardStats(); // CẬP NHẬT: Tải lại dashboard
+                        // KHÔNG GỌI fetchData()
+                    } else {
+                        alert('Lỗi: ' + (result.message || 'Không nhận được dữ liệu hợp lệ.'));
+                    }
+                } catch (error) {
+                    alert('Lỗi khi lưu:\n' + error.message);
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                }
+            },
+
+            // Thay thế hàm deleteItem của bạn bằng hàm này:
+
+            deleteItem: async function (itemId, hardDelete = false) {
+                const isAdminAction = (this.userRole === 'admin' || this.userRole === 'boss') && hardDelete;
+                const confirmMessage = isAdminAction
+                    ? 'Bạn có chắc chắn muốn XÓA VĨNH VIỄN món đồ này không? Hành động này không thể hoàn tác.'
+                    : 'Bạn có chắc chắn muốn xoá món đồ này không?';
+
+                if (!confirm(confirmMessage)) return;
+                
+                try {
+                    // Gửi 'hard_delete' flag đi
+                    const formData = new FormData();
+                    formData.append('hard_delete', hardDelete);
+
+                    const response = await fetch(`/lost-and-found/delete/${itemId}`, {
+                        method: 'POST',
+                        body: formData 
+                    });
+                    
+                    const result = await response.json();
+                    if (!response.ok) {
+                        throw new Error(result.detail || 'Lỗi server');
+                    }
+                    
+                    // (Alert thành công)
+                    if (result.status === 'success') {
+                        showToast('delete');
+                        this.closeDetailsModal(); // Đóng modal chi tiết (nếu nó đang mở)
+
+                        // --- Logic Instant UI chính xác ---
+                        if (result.hard_delete) {
+                            // Xóa vĩnh viễn: Lọc bỏ khỏi mảng
+                            this.records = this.records.filter(r => r.id !== result.deleted_id);
+                            this.totalRecords--; // Giảm tổng số
+                        } else {
+                            // Xóa mềm: Cập nhật item trong mảng
+                            const index = this.records.findIndex(r => r.id === itemId);
+                            if (index !== -1) {
+                                this.records.splice(index, 1, result.item); // Thay thế item cũ bằng item mới (đã cập nhật status)
+                                this.records = [...this.records]; // Trigger Alpine re-render
+                            }
+                        }
+                        
+                        // Vẽ lại phân trang với số lượng mới
+                        this.renderPagination(this.currentPage, Math.ceil(this.totalRecords / this.recordsPerPage), this.totalRecords, this.records.length);
+                        this.fetchDashboardStats(); // CẬP NHẬT: Tải lại dashboard
+                        
+                    } else {
+                        alert('Lỗi: ' + result.message);
+                    }
+                } catch (error) {
+                    alert('Lỗi khi xóa: ' + error.message);
+                }
+            },
+
+            batchDelete: async function() {
+                if (this.selectedIds.length === 0) {
+                    alert('Vui lòng chọn ít nhất một mục để xóa.');
+                    return;
+                }
+                const confirmMessage = (this.userRole === 'admin' || this.userRole === 'boss')
+                    ? `Bạn có chắc chắn muốn XÓA VĨNH VIỄN ${this.selectedIds.length} mục đã chọn không?`
+                    : `Bạn có chắc chắn muốn xóa ${this.selectedIds.length} mục đã chọn không?`;
+
+                if (!confirm(confirmMessage)) return;
+
+                try {
+                    const response = await fetch('/lost-and-found/batch-delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ids: this.selectedIds })
+                    });
+                    
+                    const result = await response.json();
+                    if (!response.ok) {
+                        throw new Error(result.detail || 'Lỗi server');
+                    }
+                    
+                    showToast('delete');
+                    
+                    if (result.status === 'success') {
+                        // --- SỬA: INSTANT UI ---
+                        if (result.hard_delete) {
+                            // Xóa vĩnh viễn: Lọc bỏ
+                            this.records = this.records.filter(r => !result.ids.includes(r.id));
+                            this.totalRecords -= result.ids.length;
+                        } else {
+                            // Xóa mềm: Cập nhật các item đã xóa
+                            const updatedItemsMap = new Map(result.items.map(item => [item.id, item]));
+                            this.records = this.records.map(record => {
+                                if (updatedItemsMap.has(record.id)) {
+                                    return updatedItemsMap.get(record.id);
+                                }
+                                return record;
+                            });
+                        }
+                        
+                        this.selectedIds = [];
+                        this.renderPagination(this.currentPage, Math.ceil(this.totalRecords / this.recordsPerPage), this.totalRecords, this.records.length);
+                        this.fetchDashboardStats(); // CẬP NHẬT: Tải lại dashboard
+                        // KHÔNG GỌI fetchData()
+                    }
+                } catch (error) {
+                    alert('Lỗi khi xóa hàng loạt: ' + error.message);
+                }
+            }
+        };  
+    }
+</script>
+<script> // --- LOGIC HIỂN THỊ THÔNG BÁO (TOAST) MỚI ---
+    // Hàm này sẽ "mở khóa" AudioContext của trình duyệt bằng cách phát một âm thanh câm
+    // khi người dùng tương tác lần đầu tiên. Sau đó, các âm thanh khác có thể phát tự do.
+    (function() {
+      let audioUnlocked = false;
+      const unlockAudio = () => {
+        if (audioUnlocked) return;
+        const audio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+        audio.play().then(() => { audioUnlocked = true; }).catch(() => {});
+        document.body.removeEventListener('click', unlockAudio);
+      };
+      document.body.addEventListener('click', unlockAudio, { once: true });
+    })();
+
+    function showToast(action) {
+      const toastMap = {
+        add: { title: "Ghi nhận thành công", message: "Món đồ mới đã được thêm vào danh sách.", bg: "#10b981", sound: "/static/sounds/Add.mp3",
+          icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-green-500/10 animate-bounce-in"><svg class="w-5 h-5 text-green-700 dark:text-green-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></div>`
+        },
+        update: { title: "Cập nhật thành công", message: "Thông tin món đồ đã được chỉnh sửa.", bg: "#3b82f6", sound: "/static/sounds/Update.mp3",
+          icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500/10 animate-scale-fade"><svg class="w-5 h-5 text-blue-700 dark:text-blue-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg></div>`
+        },
+        return: { title: "Đã trả khách", message: "Món đồ đã được cập nhật trạng thái.", bg: "#0ea5e9", sound: "/static/sounds/Complete.mp3",
+          icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-sky-500/10 animate-rotate-in"><svg class="w-5 h-5 text-sky-700 dark:text-sky-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg></div>`
+        },
+        dispose: { title: "Đã thanh lý", message: "Món đồ đã được cập nhật trạng thái.", bg: "#64748b", sound: "/static/sounds/Complete.mp3",
+          icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-500/10 animate-rotate-in"><svg class="w-5 h-5 text-slate-700 dark:text-slate-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg></div>`
+        },
+        delete: { title: "Đã xoá", message: "Mục đã bị xoá khỏi danh sách.", bg: "#ef4444", sound: "/static/sounds/Delete.mp3",
+          icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/10 animate-shake"><svg class="w-5 h-5 text-red-700 dark:text-red-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg></div>`
+        }
+      };
+      const config = toastMap[action] || toastMap.add;
+      let toastContainer = document.getElementById('toast-container');
+      if (!toastContainer) {
+          toastContainer = document.createElement("div");
+          toastContainer.id = 'toast-container';
+          toastContainer.className = "fixed top-6 right-6 z-[99999] flex flex-col gap-3";
+          document.body.appendChild(toastContainer);
+      }
+      const toast = document.createElement("div");
+      toast.className = `group relative overflow-hidden transition-all shadow-xl border border-gray-200 dark:border-gray-700 rounded-xl px-5 py-4 w-[300px] bg-white dark:bg-[#1f2937] backdrop-blur-md animate-toastIn`;
+      toast.innerHTML = `
+        <div class="flex items-start gap-3">
+          <div class="mt-1">${config.icon}</div>
+          <div class="flex-1">
+            <div class="text-sm font-semibold text-gray-800 dark:text-white">${config.title}</div>
+            <div class="text-xs text-gray-600 dark:text-gray-300 mt-0.5">${config.message}</div>
+          </div>
+        </div>
+        <div class="progress-bar absolute bottom-0 left-0 h-[3px] bg-opacity-80"
+            style="background-color: ${config.bg}; width: 100%; transition: none;"></div>`;
+      toastContainer.appendChild(toast);
+
+      if (config.sound) {
+        const audio = new Audio(config.sound);
+        audio.volume = 0.6;
+        audio.play().catch(err => { console.warn("⚠️ Không phát được âm thanh:", err.message); });
+      }
+
+      let duration = 3500, elapsed = 0, last = performance.now();
+      const progress = toast.querySelector('.progress-bar');
+      const updateProgress = (now) => {
+        if (!toast._paused) elapsed += now - last;
+        last = now;
+        const percent = Math.max(0, 1 - elapsed / duration);
+        progress.style.width = `${percent * 100}%`;
+        if (elapsed < duration) { toast._rafId = requestAnimationFrame(updateProgress); } 
+        else {
+          toast.classList.add("opacity-0", "translate-x-6");
+          toast.style.transition = "all 0.4s ease-in-out";
+          setTimeout(() => toast.remove(), 400);
+        }
+      };
+      toast._paused = false;
+      toast._rafId = requestAnimationFrame(updateProgress);
+      toast.addEventListener("mouseenter", () => toast._paused = true);
+      toast.addEventListener("mouseleave", () => {
+        if (toast._rafId) cancelAnimationFrame(toast._rafId);
+        toast._paused = false; last = performance.now();
+        toast._rafId = requestAnimationFrame(updateProgress);
+      });
+    }
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // flatpickr và l10n/vn.js đã được tải bởi base.html
+        flatpickr("#found_date", {
+            dateFormat: "Y-m-d", // Định dạng gửi đi cho backend
+            altInput: true,      // Tạo một ô input hiển thị khác cho người dùng
+            altFormat: "d/m/Y",  // Định dạng hiển thị cho người dùng
+            locale: "vn",        // Sử dụng ngôn ngữ tiếng Việt
+            allowInput: true,    // Cho phép người dùng tự nhập
+        });
+
+        // Cập nhật biểu đồ khi đổi theme
+        window.addEventListener('themeChanged', () => {
+            const alpineComponent = document.querySelector('[x-data]').__x;
+            if (alpineComponent) {
+                alpineComponent.fetchDashboardStats(document.getElementById('dashboard-days-filter').value);
+            }
+        });
+    });
+</script>
+{% endblock %}

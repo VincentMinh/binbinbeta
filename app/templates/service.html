@@ -1,0 +1,434 @@
+{% extends "base.html" %}
+
+{% block title %}Chấm Dịch Vụ Buồng Phòng{% endblock %}
+{% set active_page = active_page or 'service' %}
+
+{% block page_title %}
+  Chấm Dịch Vụ Buồng Phòng
+{% endblock %}
+
+{% block content %}
+<style>
+  /* MODIFIED: Đã XÓA keyframes "fade-in-up" để fix lỗi scrollbar */
+
+  /* CSS cho Toast Notification (Giữ nguyên) */
+  @keyframes toastIn { from { transform: translateX(120%); opacity: 0.5; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes bounce-in { 0% { opacity: 0; transform: scale(0.3); } 50% { opacity: 1; transform: scale(1.05); } 70% { transform: scale(0.9); } 100% { transform: scale(1); } }
+  @keyframes scale-fade { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+  @keyframes rotate-in { from { opacity: 0; transform: rotate(-90deg) scale(0.5); } to { opacity: 1; transform: rotate(0) scale(1); } }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } }
+  .animate-toastIn { animation: toastIn 0.5s cubic-bezier(0.21, 1.02, 0.73, 1) forwards; }
+  .animate-bounce-in { animation: bounce-in 0.5s ease-out forwards; }
+  .animate-scale-fade { animation: scale-fade 0.4s ease-out forwards; }
+  .animate-rotate-in { animation: rotate-in 0.4s ease-out forwards; }
+  .animate-shake { animation: shake 0.5s ease-in-out forwards; }
+</style>
+
+<div class="p-4 sm:p-6 lg:p-8">
+  <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+    <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-3 w-full sm:w-auto">
+        <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100">
+          Danh sách dịch vụ
+        </h2>
+        <span class="text-sm font-medium px-3 py-1 rounded-full bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800">
+          {{ branch_id }}
+        </span>
+      </div>
+      <div class="flex items-center gap-3 w-full sm:w-auto">
+        <button id="reloadBtn" class="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-blue-600 hover:to-purple-600 text-white px-5 py-2 rounded-lg shadow-md flex items-center gap-2 font-semibold transition text-sm" title="Tải lại danh sách">
+          <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v6h-6"/></svg>
+          <span>Tải lại</span>
+        </button>
+        <button id="addEmployeeBtn" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-teal-600 hover:to-green-600 text-white px-5 py-2 rounded-lg shadow-md flex items-center gap-2 font-semibold transition text-sm" title="Thêm nhân viên">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span>Thêm</span>
+        </button>
+        <button id="serviceSaveBtn" class="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-amber-600 hover:to-orange-600 text-white px-5 py-2 rounded-lg shadow-md flex items-center gap-2 font-semibold transition text-sm">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2-2h9l5 5v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"/><path d="M7 7h7v6H7z"/></svg>
+          <span>Lưu</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="hidden md:block">
+      <div class="overflow-x-auto">
+        <table class="w-full" id="serviceTable">
+          <thead class="bg-slate-50 dark:bg-slate-800/50">
+            <tr class="text-left text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">
+              <th class="font-semibold px-6 py-4 w-52">Nhân viên</th>
+              <th class="font-semibold px-4 py-4 w-36">Số phòng</th>
+              <th class="font-semibold px-4 py-4 w-32">Số lượng</th>
+              <th class="font-semibold px-4 py-4 w-48">Dịch vụ</th>
+              <th class="font-semibold px-4 py-4">Ghi chú</th>
+              <th class="w-16 px-4 py-4"></th>
+            </tr>
+          </thead>
+          <tbody id="serviceTableBody" class="text-sm text-slate-800 dark:text-slate-200 divide-y divide-slate-200 dark:divide-slate-800">
+            </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="serviceList" class="space-y-4 md:hidden p-4">
+      </div>
+
+    <div id="emptyHint" class="hidden text-center text-slate-500 dark:text-slate-400 text-sm py-16">
+      <div class="mb-4">
+        <svg class="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75l-2.489-2.489m0 0a3.375 3.375 0 10-4.773-4.773 3.375 3.375 0 004.774 4.774zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <p class="font-semibold">Chưa có nhân viên nào</p>
+      <p class="mt-1">Bấm nút "Tải lại" để lấy danh sách đã điểm danh hoặc "Thêm" để tìm nhân viên.</p>
+    </div>
+  </div>
+</div>
+
+<div id="addModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+  <div class="w-full max-w-md">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 space-y-4">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100">Thêm nhân viên</h3>
+        <button id="closeModalBtn" class="p-1 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-400/20 dark:hover:bg-slate-600/30 transition-colors" aria-label="Đóng">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="relative">
+        <input id="searchInput" type="text" inputmode="search" placeholder="Tìm nhân viên BP..." class="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700/80 rounded-xl px-4 py-3 text-base focus-ring text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400" aria-label="Tìm nhân viên" />
+        <svg class="w-5 h-5 absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+      </div>
+      <div id="searchResults" class="space-y-2 max-h-[50vh] overflow-y-auto -mr-2 pr-2">
+        </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+  // ------- State & constants -------
+  let currentBranch = "{{ branch_id }}";
+  const csrfToken = "{{ csrf_token | default('') }}"; 
+  let serviceRows = JSON.parse('{{ initial_employees | tojson | safe }}' || '[]');
+
+  // DOM Elements
+  const serviceList = document.getElementById("serviceList");
+  const serviceTableBody = document.getElementById("serviceTableBody");
+  const addModal = document.getElementById("addModal");
+  const emptyHint = document.getElementById("emptyHint");
+  const searchInput = document.getElementById("searchInput");
+  const searchResults = document.getElementById("searchResults");
+
+  const SERVICES = ["Giặt","Ủi"];
+  const fmt = (v) => (v == null ? "" : String(v));
+
+  // ------- UI helpers -------
+  // (Modal add/close giữ nguyên)
+  const openModal = () => {
+    addModal.classList.remove("hidden");
+    setTimeout(() => searchInput.focus(), 50);
+  };
+  const closeModal = () => {
+    addModal.classList.add("hidden");
+    searchInput.value = "";
+    searchResults.innerHTML = "";
+  };
+  document.getElementById("addEmployeeBtn").onclick = openModal;
+  document.getElementById("closeModalBtn").onclick = closeModal;
+  addModal.addEventListener('click', (e) => {
+    if (e.target === addModal) closeModal();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !addModal.classList.contains('hidden')) {
+      closeModal();
+    }
+  });
+
+
+  // MODIFIED: Đổi inputBase sang style "bình thường" (luôn có viền)
+  const inputBase = "w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-lg px-3 py-2 text-sm focus-ring focus:border-primary-500 dark:focus:border-primary-500 transition-colors duration-200";
+  const selectBase = inputBase + " appearance-none";
+  const btnLink = "text-xs text-red-600 hover:text-red-700 dark:text-red-500 dark:hover:text-red-400";
+
+  // ------- Render (Mobile cards + Desktop table) -------
+  function renderService() {
+    const hasData = Array.isArray(serviceRows) && serviceRows.length > 0;
+    emptyHint.classList.toggle("hidden", hasData);
+
+    serviceList.innerHTML = "";
+    serviceRows.forEach((r,i)=>{
+      const wrap = document.createElement("div");
+      // MODIFIED: Xóa "fade-in-up" để fix lỗi scrollbar
+      wrap.className = "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4";
+      // MODIFIED: Xóa animationDelay
+      wrap.innerHTML = `
+        <div class="flex justify-between items-start">
+          <div class="font-semibold text-slate-800 dark:text-slate-100">${fmt(r.name)}</div>
+          <button type="button" class="p-1.5 rounded-full text-slate-400 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-600 dark:hover:text-red-500 transition-colors" onclick="removeRow(${i})" aria-label="Xóa dòng">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="mt-3 grid grid-cols-3 gap-3">
+          <input placeholder="Số phòng" class="${inputBase}" data-i="${i}" data-f="so_phong" value="${fmt(r.so_phong)}" oninput="syncInputs(this)">
+          <input type="number" min="1" placeholder="Số lượng" class="${inputBase}" data-i="${i}" data-f="so_luong" value="${fmt(r.so_luong)}" oninput="syncInputs(this)">
+          <div class="relative">
+            <select class="${selectBase} pr-8" data-i="${i}" data-f="dich_vu" onchange="syncInputs(this)">${serviceOptions(r.dich_vu)}</select>
+            <svg class="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+        </div>
+        <textarea placeholder="Ghi chú (nếu có)..." class="mt-3 w-full ${inputBase}" rows="2" data-i="${i}" data-f="ghi_chu" oninput="syncInputs(this)">${fmt(r.ghi_chu)}</textarea>
+      `;
+      serviceList.appendChild(wrap);
+    });
+
+    serviceTableBody.innerHTML = "";
+    serviceRows.forEach((r,i)=>{
+      const tr = document.createElement("tr");
+      // MODIFIED: Xóa "fade-in-up" để fix lỗi scrollbar
+      tr.className = "transition-colors border-b border-slate-200 dark:border-slate-800 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800/50";
+      // MODIFIED: Xóa animationDelay
+      tr.innerHTML = `
+        <td class="px-6 py-3 font-medium text-slate-800 dark:text-slate-100">${fmt(r.name)}</td>
+        <td class="px-4 py-3"><input placeholder="VD: 201" class="${inputBase}" data-i="${i}" data-f="so_phong" value="${fmt(r.so_phong)}" oninput="syncInputs(this)"></td>
+        <td class="px-4 py-3"><input type="number" min="1" placeholder="VD: 2" class="${inputBase}" data-i="${i}" data-f="so_luong" value="${fmt(r.so_luong)}" oninput="syncInputs(this)"></td>
+        <td class="px-4 py-3">
+          <div class="relative">
+            <select class="${selectBase} pr-8" data-i="${i}" data-f="dich_vu" onchange="syncInputs(this)">${serviceOptions(r.dich_v_vu)}</select>
+            <svg class="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+        </td>
+        <td class="px-4 py-3"><textarea placeholder="Ghi chú (nếu có)..." class="${inputBase}" rows="1" data-i="${i}" data-f="ghi_chu" oninput="syncInputs(this)">${fmt(r.ghi_chu)}</textarea></td>
+        <td class="px-4 py-3 text-right">
+          <button type="button" onclick="removeRow(${i})" class="p-1.5 rounded-full text-slate-400 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-600 dark:hover:text-red-500 transition-colors" aria-label="Xóa dòng">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </td>
+      `;
+      serviceTableBody.appendChild(tr);
+    });
+  }
+  
+  // (Hàm syncInputs, serviceOptions, removeRow giữ nguyên)
+  function syncInputs(el) {
+    const index = el.dataset.i; const field = el.dataset.f;
+    const value = el.type === 'number' ? (el.value === '' ? '' : Number(el.value)) : el.value;
+    if (serviceRows[index]) serviceRows[index][field] = value;
+    unsaved = true;
+    document.querySelectorAll(`[data-i='${index}'][data-f='${field}']`).forEach(otherEl => { if (otherEl !== el) otherEl.value = el.value; });
+  };
+  function serviceOptions(selected){
+    let html = '<option value="">Chọn</option>';
+    for(const s of SERVICES){ html += `<option value="${s}" ${selected===s? 'selected':''}>${s}</option>`; }
+    return html;
+  }
+  function removeRow(i) { serviceRows.splice(i, 1); renderService(); unsaved = true; }
+
+  // ------- Save (Đã dùng showToast) -------
+  async function saveService(event){
+    const submitBtn = event.target.closest('button');
+    if (submitBtn.disabled) return;
+    const normalized = serviceRows.map(r => ({
+      ma_nv: r.code, chi_nhanh_chinh: r.branch, chi_nhanh_lam: currentBranch,
+      ghi_chu: r.ghi_chu || "", dich_vu: r.dich_vu, so_phong: r.so_phong, so_luong: r.so_luong
+    }));
+    if (!normalized || normalized.length === 0) { showErrorToast("Danh sách trống, không có gì để lưu."); return; }
+    for (const row of normalized) {
+      if (!row.so_phong) { showErrorToast(`Vui lòng nhập "Số phòng".`); return; }
+      if (row.so_luong === '' || row.so_luong == null) { showErrorToast(`Vui lòng nhập "Số lượng".`); return; }
+      if (row.so_luong <= 0) { showErrorToast(`Số lượng phải lớn hơn 0.`); return; }
+      if (!row.dich_vu) { showErrorToast(`Vui lòng chọn "Dịch vụ".`); return; }
+    }
+    submitBtn.disabled = true;
+    submitBtn.querySelector('span').textContent = 'Đang lưu...';
+    try {
+      const res = await fetch("/service/checkin_bulk", {
+        method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+        body: JSON.stringify(normalized)
+      });
+      if (!res.ok) {
+        let errorText = `Lỗi máy chủ: ${res.status}`;
+        try { const errorData = await res.json(); if (errorData.detail) errorText = errorData.detail; } catch { /* Ignore */ }
+        throw new Error(errorText);
+      }
+      showToast('update');
+      await loadInitialEmployees(false);
+    } catch (e) {
+      showErrorToast(e.message);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.querySelector('span').textContent = 'Lưu';
+    }
+  }
+  document.getElementById("serviceSaveBtn").addEventListener('click', saveService);
+
+  // ------- Search (Đã dùng showToast) -------
+  const debounce = (fn, d=250)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), d); }; };
+  const renderSearchResults = (data, query)=>{
+    searchResults.innerHTML = "";
+    if(!Array.isArray(data) || data.length===0){
+      if (query && query.length <= 1) {
+        return; // Không hiển thị gì nếu query quá ngắn
+      }
+      searchResults.innerHTML = "<div class='text-slate-400 text-sm px-3 py-2'>Không tìm thấy</div>"; return;
+    }
+    data.forEach(emp=>{
+      const btn = document.createElement("button");
+      btn.type = "button"; 
+      btn.className = "w-full text-left px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/50 active:scale-[.99] transition";
+      btn.innerHTML = `<div class='flex items-center justify-between'>
+        <span class='font-medium text-slate-800 dark:text-slate-100'>${emp.name}</span>
+        <span class='text-xs text-slate-500 dark:text-slate-400'>${emp.code}</span>
+      </div>`;
+      btn.onclick = ()=>{
+        if(serviceRows.some(r=> r.code===emp.code)) {
+          showErrorToast('Nhân viên này đã có trong danh sách.');
+          return;
+        }
+        serviceRows.unshift({ code: emp.code, name: emp.name, branch: emp.branch, so_phong:"", so_luong:"", dich_vu:"", ghi_chu:"" });
+        renderService(); closeModal();
+        searchInput.value = ""; searchResults.innerHTML = "";
+        unsaved = true;
+        showToast('add');
+      };
+      searchResults.appendChild(btn);
+    });
+  };
+  const doSearch = debounce(async(q)=>{
+    if(!q){ renderSearchResults([], q); return; }
+    const url = `/attendance/api/employees/search?q=${encodeURIComponent(q)}&role_filter=buongphong`;
+    try{
+      const data = await fetch(url).then(r=> r.json());
+      renderSearchResults(data, q);
+    }catch{ renderSearchResults([]); }
+  }, 260);
+  searchInput.addEventListener('input', (e)=> doSearch(e.target.value.trim()));
+
+  // ------- Reload (Đã dùng showToast) -------
+  async function loadInitialEmployees(showModals = true){
+    try{
+      const data = await fetch('/attendance/api/last-checked-in-bp').then(r=>{ if(!r.ok) throw new Error('Lỗi máy chủ khi tải lại.'); return r.json(); });
+      if(!Array.isArray(data)) throw new Error('API không trả về mảng.');
+      serviceRows = data;
+      renderService();
+      unsaved = false;
+      if (showModals) {
+        showToast('reload');
+      }
+    }catch(e){
+      if (showModals) {
+        showErrorToast("Lỗi tải lại: " + e.message);
+      } else {
+        console.error("Lỗi khi tải lại danh sách (ẩn):", e.message);
+      }
+    }
+  }
+  document.getElementById("reloadBtn").onclick = () => loadInitialEmployees(true);
+
+  // ------- Auto-logout script (Giữ nguyên) -------
+  function checkAndLogoutForShiftChange() {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const isMorningLogout = (hours === 6 && minutes === 59);
+      const isEveningLogout = (hours === 18 && minutes === 59);
+      if (isMorningLogout || isEveningLogout) {
+          console.log("Đã đến giờ chuyển ca, tự động đăng xuất...");
+          window.location.href = '/logout';
+      }
+  }
+  setInterval(checkAndLogoutForShiftChange, 30000);
+
+  // ------- Initial Load (Giữ nguyên) -------
+  window.addEventListener('DOMContentLoaded', ()=>{
+    loadInitialEmployees(false);
+  });
+</script>
+
+<script>
+    (function() {
+      let audioUnlocked = false;
+      const unlockAudio = () => {
+        if (audioUnlocked) return;
+        const audio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+        audio.play().then(() => { audioUnlocked = true; }).catch(() => {});
+        document.body.removeEventListener('click', unlockAudio);
+      };
+      document.body.addEventListener('click', unlockAudio, { once: true });
+    })();
+
+    function showErrorToast(message) {
+      showToast('delete', message);
+    }
+
+    function showToast(action, messageOverride = "") {
+      const toastMap = {
+        add: { title: "Đã thêm", message: "Nhân viên đã được thêm vào danh sách.", bg: "#10b981", sound: "/static/sounds/Add.mp3",
+          icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-green-500/10 animate-bounce-in"><svg class="w-5 h-5 text-green-700 dark:text-green-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></div>`
+        },
+        update: { title: "Đã lưu", message: "Thông tin dịch vụ đã được lưu thành công.", bg: "#3b82f6", sound: "/static/sounds/Update.mp3",
+          icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500/10 animate-scale-fade"><svg class="w-5 h-5 text-blue-700 dark:text-blue-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7a2 2 0 0 1 2-2h9l5 5v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h7v6H7z"/></svg></div>`
+        },
+        reload: { title: "Đã tải lại", message: "Danh sách đã được làm mới.", bg: "#0ea5e9", sound: "/static/sounds/Complete.mp3",
+          icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-sky-500/10 animate-rotate-in"><svg class="w-5 h-5 text-sky-700 dark:text-sky-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12a8 8 0 1 1-2.34-5.66"/><path stroke-linecap="round" stroke-linejoin="round" d="M20 4v6h-6"/></svg></div>`
+        },
+        delete: { title: "Lỗi thao tác", message: "Đã xảy ra lỗi, vui lòng thử lại.", bg: "#ef4444", sound: "/static/sounds/Delete.mp3",
+          icon: `<div class="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/10 animate-shake"><svg class="w-5 h-5 text-red-700 dark:text-red-300 drop-shadow" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.01" /></svg></div>`
+        }
+      };
+      
+      const config = toastMap[action] || toastMap.add;
+      let toastContainer = document.getElementById('toast-container');
+      if (!toastContainer) {
+          toastContainer = document.createElement("div");
+          toastContainer.id = 'toast-container';
+          toastContainer.className = "fixed top-6 right-6 z-[99999] flex flex-col gap-3";
+          document.body.appendChild(toastContainer);
+      }
+      const toast = document.createElement("div");
+      toast.className = `group relative overflow-hidden transition-all shadow-xl border border-gray-200 dark:border-gray-700 rounded-xl px-5 py-4 w-[300px] bg-white dark:bg-[#1f2937] backdrop-blur-md animate-toastIn`;
+      toast.innerHTML = `
+        <div class="flex items-start gap-3">
+          <div class="mt-1">${config.icon}</div>
+          <div class="flex-1">
+            <div class="text-sm font-semibold text-gray-800 dark:text-white">${config.title}</div>
+            <div class="text-xs text-gray-600 dark:text-gray-300 mt-0.5">${messageOverride || config.message}</div>
+          </div>
+        </div>
+        <div class="progress-bar absolute bottom-0 left-0 h-[3px] bg-opacity-80"
+            style="background-color: ${config.bg}; width: 100%; transition: none;"></div>`;
+      toastContainer.appendChild(toast);
+
+      if (config.sound) {
+        const audio = new Audio(config.sound);
+        audio.volume = 0.6;
+        audio.play().catch(err => { console.warn("⚠️ Không phát được âm thanh:", err.message); });
+      }
+
+      let duration = 3500, elapsed = 0, last = performance.now();
+      const progress = toast.querySelector('.progress-bar');
+      const updateProgress = (now) => {
+        if (!toast._paused) elapsed += now - last;
+        last = now;
+        const percent = Math.max(0, 1 - elapsed / duration);
+        progress.style.width = `${percent * 100}%`;
+        if (elapsed < duration) { toast._rafId = requestAnimationFrame(updateProgress); } 
+        else {
+          toast.classList.add("opacity-0", "translate-x-6");
+          toast.style.transition = "all 0.4s ease-in-out";
+          setTimeout(() => toast.remove(), 400);
+        }
+      };
+      toast._paused = false;
+      toast._rafId = requestAnimationFrame(updateProgress);
+      toast.addEventListener("mouseenter", () => toast._paused = true);
+      toast.addEventListener("mouseleave", () => {
+        if (toast._rafId) cancelAnimationFrame(toast._rafId);
+        toast._paused = false; last = performance.now();
+        toast._rafId = requestAnimationFrame(updateProgress);
+      });
+    }
+</script>
+{% endblock %}

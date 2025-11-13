@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Chọn Chức năng{% endblock %}
+{% set active_page = active_page or 'dashboard' %}
+{% block page_title %}Chức năng{% endblock %}
+
+{% block content %}
+<div class="p-4 sm:p-6 lg:p-8">
+    <div class="text-center mb-12">
+        <h1 class="text-3xl md:text-4xl font-semibold tracking-tight text-slate-800 dark:text-white mb-2">
+            Chào mừng trở lại, {{ user.name or 'bạn' }}!
+        </h1>
+        <p class="text-slate-600 dark:text-slate-400 text-lg max-w-2xl mx-auto">
+            Chọn một chức năng bên dưới để bắt đầu.
+        </p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+
+        <a href="/tasks" class="group block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center transition-all duration-300 hover:border-primary-400 dark:hover:border-primary-500">
+            <div class="inline-block p-4 bg-primary-100 dark:bg-primary-900/50 rounded-lg mb-4 transition-transform duration-300 group-hover:scale-110">
+                 <svg class="w-8 h-8 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+            </div>
+            <h3 class="font-semibold text-lg text-slate-800 dark:text-white">Quản lý Công việc</h3>
+            <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Theo dõi, phân công và quản lý các nhiệm vụ.</p>
+        </a>
+
+        {% if user and user.role != 'ktv' %}
+         <a href="/lost-and-found" class="group block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center transition-all duration-300 hover:border-amber-400 dark:hover:border-amber-500">
+             <div class="inline-block p-4 bg-amber-100 dark:bg-amber-900/50 rounded-lg mb-4 transition-transform duration-300 group-hover:scale-110">
+                  <svg class="w-8 h-8 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
+             </div>
+             <h3 class="font-semibold text-lg text-slate-800 dark:text-white">Đồ Khách Để Quên</h3>
+             <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Ghi nhận và quản lý các vật dụng thất lạc.</p>
+         </a>
+         {% endif %}
+
+        {% if user and user.role == 'letan' %}
+        <a href="/service" class="group block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center transition-all duration-300 hover:border-purple-400 dark:hover:border-purple-500">
+            <div class="inline-block p-4 bg-purple-100 dark:bg-purple-900/50 rounded-lg mb-4 transition-transform duration-300 group-hover:scale-110">
+                 <svg class="w-8 h-8 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-7 0H3m4 0h5M9 7h1m-1 4h1m-1 4h1m5-4h1m-1 4h1m-1-4h1" /></svg>
+            </div>
+            <h3 class="font-semibold text-lg text-slate-800 dark:text-white">Chấm Dịch Vụ</h3>
+            <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Ghi nhận dịch vụ giặt ủi cho nhân viên.</p>
+        </a>
+        {% endif %}
+
+        <a href="/attendance/results" class="group block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center transition-all duration-300 hover:border-emerald-400 dark:hover:border-emerald-500">
+            <div class="inline-block p-4 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg mb-4 transition-transform duration-300 group-hover:scale-110">
+                <svg class="w-8 h-8 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            </div>
+            <h3 class="font-semibold text-lg text-slate-800 dark:text-white">Xem Kết Quả</h3>
+            <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Tra cứu lịch sử điểm danh đã ghi nhận.</p>
+        </a>
+
+        {% if user and user.role in ['admin', 'boss', 'quanly', 'letan', 'ktv'] %}
+         <a href="/attendance/calendar-view" class="group block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center transition-all duration-300 hover:border-cyan-400 dark:hover:border-cyan-500">
+            <div class="inline-block p-4 bg-cyan-100 dark:bg-cyan-900/50 rounded-lg mb-4 transition-transform duration-300 group-hover:scale-110">
+                <svg class="w-8 h-8 text-cyan-600 dark:text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            </div>
+            <h3 class="font-semibold text-lg text-slate-800 dark:text-white">Lịch Chấm Công</h3>
+            <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Xem tổng quan công theo dạng lịch.</p>
+        </a>
+        {% endif %}
+
+        {% if user and user.role in ['letan', 'quanly', 'admin', 'boss'] %}
+        <a href="/shift-report" class="group block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center transition-all duration-300 hover:border-orange-400 dark:hover:border-orange-500">
+            <div class="inline-block p-4 bg-orange-100 dark:bg-orange-900/50 rounded-lg mb-4 transition-transform duration-300 group-hover:scale-110">
+                <svg class="w-8 h-8 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+            </div>
+            <h3 class="font-semibold text-lg text-slate-800 dark:text-white">Bàn Giao Ca</h3>
+            <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Tạo và xem báo cáo bàn giao ca.</p>
+        </a>
+        {% endif %}
+
+        {% if user and user.role in ['admin', 'boss'] %}
+        <a href="#" id="sync-employees-btn" class="group block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center transition-all duration-300 hover:border-rose-400 dark:hover:border-rose-500">
+            <div class="inline-block p-4 bg-rose-100 dark:bg-rose-900/50 rounded-lg mb-4 transition-transform duration-300 group-hover:scale-110">
+                <svg class="w-8 h-8 text-rose-600 dark:text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+            </div>
+            <h3 class="font-semibold text-lg text-slate-800 dark:text-white">Đồng bộ Nhân viên</h3>
+            <p class="text-slate-500 dark:text-slate-400 mt-1 text-sm">Cập nhật danh sách nhân viên từ nguồn.</p>
+        </a>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const syncBtn = document.getElementById('sync-employees-btn');
+    if (syncBtn) {
+        syncBtn.addEventListener('click', async function(event) {
+            event.preventDefault();
+            if (confirm('Hành động này sẽ đồng bộ lại toàn bộ danh sách nhân viên. Bạn có chắc chắn?')) {
+                syncBtn.classList.add('opacity-50', 'pointer-events-none'); // Disable button visually
+                try {
+                    const response = await fetch('/sync-employees');
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.detail || 'Lỗi không xác định từ server.');
+                    }
+                    alert(data.message || 'Đồng bộ thành công!');
+                } catch (error) {
+                    console.error('Sync error:', error);
+                    alert('Lỗi: ' + error.message);
+                } finally {
+                    syncBtn.classList.remove('opacity-50', 'pointer-events-none'); // Re-enable
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}
