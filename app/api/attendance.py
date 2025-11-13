@@ -205,10 +205,13 @@ async def select_branch(
 
 # --- CÁC API CÒN LẠI GIỮ NGUYÊN ---
 
+# === HÀM NÀY ĐÃ ĐƯỢC SỬA LẠI LOGIC ĐỂ KHẮC PHỤC LỖI CỦA BẠN ===
 @router.get("/api/employees/by-branch/{branch_code}", response_class=JSONResponse)
 def get_employees_by_branch(branch_code: str, db: Session = Depends(get_db), request: Request = None):
     try:
-        session_user = request.session.get("user") if request else None
+        session_user = request.session.get("user") or request.session.get("pending_user")
+        if not session_user:
+             raise HTTPException(status_code=403, detail="Không có quyền truy cập.")
 
         branch = db.query(Branch).filter(Branch.branch_code == branch_code).first()
         if not branch:
@@ -217,29 +220,60 @@ def get_employees_by_branch(branch_code: str, db: Session = Depends(get_db), req
         _, shift_name = get_current_work_shift()
         current_shift_code = "CS" if shift_name == "day" else "CT"
         
+        # Bắt đầu query
         query = db.query(User).options(
             joinedload(User.department),
             joinedload(User.main_branch)
-        ).filter(User.main_branch_id == branch.id)
+        )
 
-        if session_user and session_user.get("role") == "letan":
+        user_role = session_user.get("role")
+
+        if user_role == "letan":
             letan_dept_id = db.query(Department.id).filter(Department.role_code == 'letan').scalar()
             buongphong_dept_id = db.query(Department.id).filter(Department.role_code == 'buongphong').scalar()
             baove_dept_id = db.query(Department.id).filter(Department.role_code == 'baove').scalar()
 
-            # Lễ tân thấy chính họ, VÀ buồng phòng/bảo vệ cùng ca
-            query = query.filter(
-                or_(
-                    User.id == session_user["id"],
-                    and_(
-                        User.shift == current_shift_code,
-                        User.department_id.in_([buongphong_dept_id, baove_dept_id])
-                    )
+            # === ĐÂY LÀ LOGIC SỬA LỖI ===
+            # Lọc để bao gồm:
+            # 1. Chính người lễ tân đang đăng nhập (bất kể chi nhánh chính của họ).
+            # 2. Hoặc, (là Buồng phòng HOẶC Bảo vệ) VÀ (cùng ca) VÀ (cùng chi nhánh làm việc).
+            
+            filter_logic = or_(
+                User.id == session_user["id"],
+                and_(
+                    User.main_branch_id == branch.id,
+                    User.shift == current_shift_code,
+                    User.department_id.in_([buongphong_dept_id, baove_dept_id])
                 )
             )
-        elif not session_user or session_user.get("role") not in ["admin", "boss", "quanly"]:
-            query = query.filter(User.shift == current_shift_code)
+            query = query.filter(filter_logic)
+            
+        elif user_role in ["admin", "boss", "quanly"]:
+            # Admin/Boss/Quản lý thấy tất cả mọi người ở chi nhánh đó
+            query = query.filter(User.main_branch_id == branch.id)
         
+        else: # Các vai trò khác (KTV, v.v.)
+            # Chỉ thấy chính họ (nếu họ ở chi nhánh đó) và BP/BV cùng ca
+            
+            buongphong_dept_id = db.query(Department.id).filter(Department.role_code == 'buongphong').scalar()
+            baove_dept_id = db.query(Department.id).filter(Department.role_code == 'baove').scalar()
+
+            # Lọc để bao gồm:
+            # 1. Chính user đó, VỚI ĐIỀU KIỆN user đó thuộc chi nhánh này.
+            # 2. Hoặc, (là Buồng phòng HOẶC Bảo vệ) VÀ (cùng ca) VÀ (cùng chi nhánh làm việc).
+            filter_logic = or_(
+                and_(
+                    User.id == session_user["id"],
+                    User.main_branch_id == branch.id
+                ),
+                and_(
+                    User.main_branch_id == branch.id,
+                    User.shift == current_shift_code,
+                    User.department_id.in_([buongphong_dept_id, baove_dept_id])
+                )
+            )
+            query = query.filter(filter_logic)
+
         employees = query.order_by(User.name).all()
 
         employee_list = [
