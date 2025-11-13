@@ -1500,9 +1500,12 @@ async def get_all_pending_for_branch(
     if not user_data or user_data.get("role") != "letan":
         raise HTTPException(status_code=403, detail="Chỉ Lễ tân mới có quyền truy cập.")
     
-    # Bảo mật: Đảm bảo Lễ tân chỉ truy vấn đúng chi nhánh của họ
-    if user_data.get("branch") != branch:
-        raise HTTPException(status_code=403, detail="Không được phép truy cập dữ liệu chi nhánh khác.")
+    # === BẮT ĐẦU SỬA LỖI LOGIC BẢO MẬT ===
+    # Bảo mật: Đảm bảo Lễ tân chỉ truy vấn đúng chi nhánh HỌ ĐANG LÀM VIỆC (active_branch)
+    active_branch = get_active_branch(request, db, user_data)
+    if active_branch != branch:
+        logger.warning(f"Bảo mật: Lễ tân {user_data.get('code')} (active: {active_branch}) đang cố truy cập Giao ca của chi nhánh {branch}.")
+        raise HTTPException(status_code=403, detail="Không được phép truy cập dữ liệu Giao ca của chi nhánh khác.")
 
     try:
         # SỬA: Tái sử dụng hàm logic _get_filtered_transactions
