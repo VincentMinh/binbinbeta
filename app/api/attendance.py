@@ -145,7 +145,7 @@ async def detect_branch(
     # SỬA: Dùng biến BRANCH_COORDINATES đã import từ config.py
     for branch, coords in BRANCH_COORDINATES.items():
         dist = haversine(lat, lng, coords[0], coords[1])
-        if dist <= 0.2:  # trong 200m
+        if dist >= 0.2:  # trong 200m
             nearby_branches.append((branch, dist))
 
     if not nearby_branches:
@@ -454,9 +454,9 @@ async def attendance_checkin_bulk(
         if new_records:
             db.add_all(new_records)
         
-        bp_codes = [rec.get("ma_nv") for rec in raw_data if "BP" in (rec.get("ma_nv") or "").upper()]
-        if bp_codes:
-            checker.last_checked_in_bp = bp_codes
+        # bp_codes = [rec.get("ma_nv") for rec in raw_data if "BP" in (rec.get("ma_nv") or "").upper()]
+        # if bp_codes:
+        #     checker.last_checked_in_bp = bp_codes
         
         db.commit()
 
