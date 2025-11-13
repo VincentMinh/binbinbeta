@@ -462,6 +462,10 @@ async def add_lost_item(
     if not recorder:
         recorder = db.query(User).filter(User.id == user_data["id"]).first()
 
+    # === SỬA LỖI: Thêm dòng bị thiếu để định nghĩa 'reporter' ===
+    reporter = db.query(User).filter(User.employee_code == reported_by_code).first()
+    # === KẾT THÚC SỬA LỖI ===
+
     chi_nhanh_code = chi_nhanh_code_from_form # Ưu tiên chi nhánh từ form (cho Admin)
     
     if not chi_nhanh_code and user_data.get("role") == 'letan':
@@ -470,7 +474,6 @@ async def add_lost_item(
         chi_nhanh_code = get_active_branch(request, db, user_data) # <--- SỬA Ở ĐÂY
     
     branch = db.query(Branch).filter(Branch.branch_code == chi_nhanh_code).first()
-    # === KẾT THÚC SỬA LỖI ===
 
     if not reporter:
         raise HTTPException(status_code=400, detail=f"Không tìm thấy người báo cáo với mã: {reported_by_code}")
