@@ -225,6 +225,12 @@
     /* Helpers */
     function escapeHtml(s){ return String(s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
     function escapeAttr(s){ return String(s||"").replaceAll('"','&quot;'); }
+    
+    // === THÊM HÀM NÀY ĐỂ SỬA LỖI ===
+    function branchDisplay(branchCode) {
+      if (!branchCode) return "(Chưa rõ)";
+      return branchCode; // Tạm thời chỉ hiển thị mã. Bạn có thể thêm logic B1 -> "Chi nhánh 1" ở đây.
+    }
 
     /* ===== Status Modal Logic ===== */
     function updateEmployeeOvertime(emp) {
