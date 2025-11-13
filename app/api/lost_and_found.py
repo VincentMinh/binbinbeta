@@ -443,6 +443,7 @@ async def add_lost_item(
     
     item_name = form_data.get("item_name")
     found_location = form_data.get("found_location")
+
     chi_nhanh_code_from_form = form_data.get("chi_nhanh")
     reported_by_string = form_data.get("reported_by")
     recorded_by_string = form_data.get("recorded_by")
@@ -461,13 +462,20 @@ async def add_lost_item(
     if not recorder:
         recorder = db.query(User).filter(User.id == user_data["id"]).first()
 
-    reporter = db.query(User).filter(User.employee_code == reported_by_code).first()
-    chi_nhanh_code = chi_nhanh_code_from_form or (user_data.get("branch") if user_data.get("role") == 'letan' else None)
+    chi_nhanh_code = chi_nhanh_code_from_form # Ưu tiên chi nhánh từ form (cho Admin)
+    
+    if not chi_nhanh_code and user_data.get("role") == 'letan':
+        # Nếu là Lễ tân và form không gửi chi nhánh,
+        # hãy lấy chi nhánh đang hoạt động (active_branch) từ session.
+        chi_nhanh_code = get_active_branch(request, db, user_data) # <--- SỬA Ở ĐÂY
+    
     branch = db.query(Branch).filter(Branch.branch_code == chi_nhanh_code).first()
+    # === KẾT THÚC SỬA LỖI ===
 
     if not reporter:
         raise HTTPException(status_code=400, detail=f"Không tìm thấy người báo cáo với mã: {reported_by_code}")
     if not branch:
+        # Lỗi bây giờ sẽ rõ ràng hơn, ví dụ: "Không tìm thấy chi nhánh: B10"
         raise HTTPException(status_code=400, detail=f"Không tìm thấy chi nhánh: {chi_nhanh_code}")
 
     new_item = LostAndFoundItem(
@@ -541,14 +549,22 @@ async def edit_lost_item_details(
     else: 
         recorder = item.recorder
 
+    #
     branch = None
-    if chi_nhanh:
-        branch = db.query(Branch).filter(Branch.branch_code == chi_nhanh).first()
-    if not branch and user_data.get("role") == 'letan':
-        active_branch_code = get_active_branch(request, db, user_data)
-        branch = db.query(Branch).filter(Branch.branch_code == active_branch_code).first()
+    chi_nhanh_code_to_find = chi_nhanh # Ưu tiên giá trị từ form (cho Admin/QL)
+
+    if not chi_nhanh_code_to_find and user_data.get("role") == 'letan':
+        # Nếu là Lễ tân và form không có chi nhánh,
+        # Lấy chi nhánh đang hoạt động (active_branch) từ session.
+        chi_nhanh_code_to_find = get_active_branch(request, db, user_data)
+    
+    if not chi_nhanh_code_to_find:
+         # Nếu sau tất cả vẫn không có mã chi nhánh (ví dụ: Admin không chọn)
+         raise HTTPException(status_code=400, detail="Chi nhánh không hợp lệ hoặc không được cung cấp.")
+
+    branch = db.query(Branch).filter(Branch.branch_code == chi_nhanh_code_to_find).first()
     if not branch:
-        raise HTTPException(status_code=400, detail="Chi nhánh không hợp lệ hoặc không được cung cấp.")
+        raise HTTPException(status_code=400, detail=f"Không tìm thấy chi nhánh: {chi_nhanh_code_to_find}")
 
     # (Giữ nguyên logic cập nhật item)
     item.item_name = item_name
