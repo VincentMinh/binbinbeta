@@ -309,7 +309,8 @@
   // ------- Reload (Đã dùng showToast) -------
   async function loadInitialEmployees(showModals = true){
     try{
-      const data = await fetch('/attendance/api/last-checked-in-bp').then(r=>{ if(!r.ok) throw new Error('Lỗi máy chủ khi tải lại.'); return r.json(); });
+      // SỬA ĐƯỜNG DẪN API SANG /service/api/...
+      const data = await fetch('/service/api/get-checked-in-bp').then(r=>{ if(!r.ok) throw new Error('Lỗi máy chủ khi tải lại.'); return r.json(); });
       if(!Array.isArray(data)) throw new Error('API không trả về mảng.');
       serviceRows = data;
       renderService();
