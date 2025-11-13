@@ -343,7 +343,7 @@
 
   // ------- Initial Load (Giữ nguyên) -------
   window.addEventListener('DOMContentLoaded', ()=>{
-    loadInitialEmployees(false);
+    renderService(); // <-- SỬA LỖI: Dùng ngay dữ liệu (serviceRows) đã được server chuẩn bị
   });
 </script>
 
