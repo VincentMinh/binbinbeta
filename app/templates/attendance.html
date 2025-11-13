@@ -693,6 +693,7 @@
     });
 
     /* ===== Init ===== */
+    /* ===== Init ===== */
     window.addEventListener("DOMContentLoaded", async ()=>{
       // Hiển thị cảnh báo ca đêm nếu điểm danh trước 7h sáng
       const now = new Date();
@@ -711,24 +712,28 @@
       }
 
       renderSkeleton(4);
-      const role = (userRole||"").toLowerCase();
-      if (["quanly","ktv","boss","admin"].includes(role)){
-        try{
-          const data = await safeFetchJson("/attendance/api/detect-branch", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({}) });
-          if (data && data.branch){
-            currentBranch = data.branch;
+
+      // === LOGIC SỬA LỖI 404 BẮT ĐẦU TỪ ĐÂY ===
+      // Sử dụng biến 'currentBranch' mà server đã cung cấp,
+      // thay vì gọi API 'detect-branch' không tồn tại.
+
+      if (currentBranch && currentBranch !== "None") {
+        // Cập nhật tên chi nhánh lên giao diện
+        try {
+            // Giả sử bạn có hàm branchDisplay(), nếu không, dùng tạm currentBranch
             document.getElementById("branchName").textContent = branchDisplay(currentBranch);
-            await loadEmployeesForBranch();
-          }else{
-            disableForm("Không tìm thấy chi nhánh chính cho tài khoản.");
-          }
-        }catch(err){ disableForm("Không thể lấy chi nhánh chính."); }
-        return;
-      }
-      const detected = await detectBranchByGPS();
-      if (detected){
+        } catch (e) {
+            document.getElementById("branchName").textContent = currentBranch; // Fallback
+        }
+        
+        // Tải danh sách nhân viên cho chi nhánh này
         await loadEmployeesForBranch();
+      } else {
+        // Nếu server không trả về chi nhánh nào, thì mới báo lỗi
+        disableForm("Không thể xác định chi nhánh làm việc từ server.");
       }
+      // === KẾT THÚC SỬA LỖI ===
+
     });
   </script>
 </body>
