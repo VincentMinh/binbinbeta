@@ -117,8 +117,11 @@ def login_submit(
     request.session["qr_token"] = token
     
     if is_mobile:
-        return RedirectResponse("/attendance/ui", status_code=303)
+        # Sửa thành /attendance/ (root của router attendance) thay vì /attendance/ui
+        return RedirectResponse("/attendance/", status_code=303) 
     else:
+        # Nếu bạn chưa có route /attendance/show_qr, hãy đổi cái này thành /attendance/ luôn
+        # Tạm thời tôi giữ nguyên show_qr nếu bạn có file qr_checkin.py xử lý nó
         return RedirectResponse("/attendance/show_qr", status_code=303)
 
 @router.get("/login", response_class=HTMLResponse)
