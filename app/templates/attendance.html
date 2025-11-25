@@ -215,9 +215,11 @@
 
   <script>
     /* ========= Endpoint backend (giữ nguyên) ========= */
-    const byBranchUrl = (b) => `/attendance/api/employees/by-branch/${encodeURIComponent(b)}`;
-    const searchUrl   = (q) => `/attendance/api/employees/search?q=${encodeURIComponent(q)}&loginCode=${encodeURIComponent(loginCode)}`;
-    const saveUrl     = () => `/attendance/checkin_bulk`;
+    const byBranchUrl = (b) => `{{ url_for('get_employees_by_branch', branch_code='PLACEHOLDER') }}`.replace('PLACEHOLDER', encodeURIComponent(b));
+    const searchUrl   = (q) => `{{ url_for('search_employees') }}?q=${encodeURIComponent(q)}&loginCode=${encodeURIComponent(loginCode)}`;
+    const saveUrl     = () => `{{ url_for('attendance_checkin_bulk') }}`;
+    const detectBranchUrl = () => `{{ url_for('detect_branch') }}`; // Dùng cho hàm detectBranchByGPS
+    const selectBranchUrl = () => `{{ url_for('select_branch') }}`; // Dùng cho hàm showBranchSelectionPopup
 
     /* Local state */
     let employees = [];
@@ -551,6 +553,12 @@
       vibrate();
       const saveBtn = document.getElementById('saveBtn');
       if (saveBtn.disabled) return; // Prevent double-click
+
+      if (!currentBranch) {
+        showStatusModal('error', "Chưa xác định được chi nhánh làm việc. Vui lòng bấm 'Tải lại' hoặc chờ GPS.");
+        return;
+      }
+
       saveBtn.disabled = true;
       saveBtn.textContent = 'ĐANG LƯU...';
 
@@ -622,7 +630,7 @@
         if (!navigator.geolocation){ disableForm("Trình duyệt không hỗ trợ GPS."); return resolve(null); }
         navigator.geolocation.getCurrentPosition(async (pos)=>{
           try{
-            const data = await safeFetchJson("/attendance/api/detect-branch", {
+            const data = await safeFetchJson(detectBranchUrl(), {
               method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ lat:pos.coords.latitude, lng:pos.coords.longitude })
             });
             if (data && data.error){ disableForm(data.error); return resolve(null); }
@@ -654,7 +662,7 @@
           currentBranch = ch.branch;
           document.getElementById("branchName").textContent = branchDisplay(currentBranch);
           try{
-            await safeFetchJson("/attendance/api/select-branch", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ branch: ch.branch }) });
+            await safeFetchJson(selectBranchUrl(), { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ branch: ch.branch }) });
             closeModal('branchPopup'); await loadEmployeesForBranch();
           }catch(err){ showStatusModal('error', "Lỗi chọn chi nhánh: " + (err?.message || err)); }
         };
