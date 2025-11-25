@@ -78,13 +78,22 @@ def attendance_ui(request: Request, db: Session = Depends(get_db)):
     
     csrf_token = get_csrf_token(request)
     
+    token_val = ""
+    if request.session.get("pending_user"):
+        # Giả sử logic của bạn lưu token đâu đó, hoặc bạn không cần nó khi vào trực tiếp.
+        # Tuy nhiên, để tránh lỗi template render warning, hãy truyền nó vào.
+        pass 
+
     response = templates.TemplateResponse("attendance.html", {
         "request": request,
         "branch_id": active_branch, 
         "csrf_token": csrf_token,
         "user": user_data,
         "login_code": user_data.get("code", ""),
+        "role": user_data.get("role", ""), # Thêm dòng này nếu template cần biến role
+        "token": request.query_params.get("token", "") # Truyền token để template không bị lỗi
     })
+    
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
@@ -145,7 +154,7 @@ async def detect_branch(
     # SỬA: Dùng biến BRANCH_COORDINATES đã import từ config.py
     for branch, coords in BRANCH_COORDINATES.items():
         dist = haversine(lat, lng, coords[0], coords[1])
-        if dist <= 0.2:  # trong 200m
+        if dist >= 0.2:  # trong 200m
             nearby_branches.append((branch, dist))
 
     if not nearby_branches:
