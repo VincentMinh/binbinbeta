@@ -153,7 +153,7 @@ async def detect_branch(
     # SỬA: Dùng biến BRANCH_COORDINATES đã import từ config.py
     for branch, coords in BRANCH_COORDINATES.items():
         dist = haversine(lat, lng, coords[0], coords[1])
-        if dist >= 0.2:  # trong 200m
+        if dist <= 0.2:  # trong 200m
             nearby_branches.append((branch, dist))
 
     if not nearby_branches:
