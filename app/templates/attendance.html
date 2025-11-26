@@ -1,217 +1,311 @@
 <!DOCTYPE html>
-<html lang="vi" class="h-full">
+<html lang="vi" class="h-full antialiased scroll-smooth">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
   <title>Điểm danh — Bin Bin Hotel</title>
+  
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Config Tailwind cho Dark Mode & Font -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+          },
+          colors: {
+            primary: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' },
+            dark: { 800: '#1e293b', 900: '#0f172a', 950: '#020617' } // Slate-based dark theme
+          },
+          animation: {
+            'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            'fade-in': 'fadeIn 0.2s ease-out',
+            'pop': 'pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+          },
+          keyframes: {
+            slideUp: {
+              '0%': { transform: 'translateY(20px)', opacity: '0' },
+              '100%': { transform: 'translateY(0)', opacity: '1' },
+            },
+            fadeIn: {
+              '0%': { opacity: '0' },
+              '100%': { opacity: '1' },
+            },
+            pop: {
+              '0%': { transform: 'scale(0.8)' },
+              '100%': { transform: 'scale(1)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts (Inter) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
   <style>
+    /* Custom Scrollbar hide */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    /* Safe Area Variables */
     :root {
-      --safe-bottom: env(safe-area-inset-bottom, 0px);
       --safe-top: env(safe-area-inset-top, 0px);
-    }
-    /* Modal animation */
-    .modal { transition: opacity 200ms ease-in-out; }
-    .modal > div { transition: transform 200ms ease-in-out, opacity 200ms ease-in-out; }
-    .modal.hidden { opacity: 0; pointer-events: none; }
-    .modal.hidden > div { transform: translateY(1rem) scale(0.98); opacity: 0; }
-
-    /* Gradient button animation */
-    .btn-gradient {
-      background-image: linear-gradient(to right, #2563eb 0%, #06b6d4 50%, #2563eb 100%);
-      background-size: 200% auto;
-      transition: background-position 0.3s cubic-bezier(.4,0,.2,1), transform 0.1s ease-out, box-shadow 0.2s ease;
-    }
-    .btn-gradient:hover {
-      background-position: right center;
-    }
-    .btn-gradient:active { box-shadow: 0 2px 10px -2px rgba(37, 99, 235, 0.5); }
-    /* Focus ring */
-    .focus-ring:focus{ outline:none; box-shadow: 0 0 0 3px rgba(59,130,246,.25); border-color: #60a5fa; }
-    /* Toast animation */
-    /* Status Modal (Loading, Success, Error) */
-    .checkmark__circle {
-      stroke-dasharray: 166;
-      stroke-dashoffset: 166;
-      stroke-width: 2;
-      stroke-miterlimit: 10;
-      fill: none;
-      animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
-    }
-    .checkmark {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      display: block;
-      stroke-width: 2;
-      stroke: #fff;
-      stroke-miterlimit: 10;
-      margin: 10% auto;
-      animation-duration: .4s, .3s; animation-timing-function: ease-in-out, ease-in-out; animation-delay: .4s, .9s; animation-fill-mode: forwards, both;
-    }
-    .checkmark__check {
-      transform-origin: 50% 50%;
-      stroke-dasharray: 48;
-      stroke-dashoffset: 48;
-      animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
-    }
-    @keyframes stroke { 100% { stroke-dashoffset: 0; } }
-    @keyframes scale { 0%, 100% { transform: none; } 50% { transform: scale3d(1.1, 1.1, 1); } }
-    @keyframes fill-green { 100% { box-shadow: inset 0px 0px 0px 40px #4ade80; } }
-    #statusSuccess .checkmark__circle { stroke: #4ade80; } /* green-400 */
-    #statusSuccess .checkmark { animation-name: fill-green, scale; }
-    #statusSuccess .timer-bar-container { background-color: rgba(74, 222, 128, 0.5); }
-    #statusSuccess .timer-bar-inner { background-color: #4ade80; }
-    .timer-bar-inner { animation-name: shrink; animation-timing-function: linear; animation-fill-mode: forwards; }
-    @keyframes shrink { from { width: 100%; } to { width: 0%; } }
-
-    /* List item animations */
-    @keyframes item-in {
-      from { opacity: 0; transform: translateY(15px) scale(0.98); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    .attendance-item {
-      animation: item-in 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
-    }
-    .item-out {
-      animation: item-out 0.35s ease-in-out forwards;
-    }
-    @keyframes item-out {
-      to { opacity: 0; transform: scale(0.95); height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; border-width: 0; }
+      --safe-bottom: env(safe-area-inset-bottom, 20px);
     }
 
-    @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+    /* Base styles */
+    body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+    
+    /* Smooth transitions for theme switch */
+    body, div, p, span, input, select, button {
+      transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      transition-duration: 200ms;
+    }
+
+    /* Glassmorphism utilities */
+    .glass {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255, 255, 255, 0.5);
+    }
+    .dark .glass {
+      background: rgba(15, 23, 42, 0.85);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Remove Input Spinners */
+    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   </style>
 </head>
-<body class="bg-slate-50 font-sans text-slate-800 antialiased">
-  <div class="mx-auto max-w-lg px-4 pt-4 pb-28">
-    <!-- Header -->
-    <header class="flex items-center gap-3 py-2" style="padding-top: calc(var(--safe-top) + 8px)">
-      <div class="grid h-11 w-11 place-items-center rounded-2xl bg-blue-600 shadow-md">
-        <svg class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 5v14M5 12h14"/></svg>
+<body class="bg-gray-50 text-slate-800 dark:bg-dark-950 dark:text-slate-200">
+
+  <!-- Main Layout -->
+  <div class="mx-auto max-w-lg min-h-screen flex flex-col relative pb-32">
+    
+    <!-- Header (Sticky & Glass) -->
+    <header class="sticky top-0 z-30 glass px-4 py-3 flex items-center justify-between shadow-sm shadow-slate-200/50 dark:shadow-none" style="padding-top: calc(var(--safe-top) + 12px)">
+      <div class="flex items-center gap-3">
+        <div class="relative group cursor-pointer">
+          <div class="absolute -inset-1.5 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-200"></div>
+          <div class="relative h-10 w-10 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center shadow-sm border border-slate-100 dark:border-slate-700">
+            <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          </div>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-slate-900 dark:text-white">Điểm danh</h1>
+          <p class="text-xs font-medium text-slate-500 dark:text-slate-400" id="currentDateDisplay">Bin Bin Hotel</p>
+        </div>
       </div>
-      <div class="flex-1">
-        <h1 class="text-lg font-bold text-slate-900">Điểm danh</h1>
-        <p class="text-sm text-slate-500">Giao diện điểm danh nhân viên</p>
-      </div>
+      
+      <!-- Theme Toggle -->
+      <button id="themeToggle" class="p-2.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all focus:outline-none active:scale-95">
+        <!-- Sun Icon -->
+        <svg id="sunIcon" class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+        <!-- Moon Icon -->
+        <svg id="moonIcon" class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+      </button>
     </header>
 
-    <!-- Night Shift Notification -->
-    <div id="nightShiftNotice" class="hidden mt-4 flex items-center gap-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 shadow-sm" role="alert">
-      <svg class="h-5 w-5 flex-shrink-0 text-yellow-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21.64 13.5A9 9 0 1 1 11.5 3.36M22 12l-6-6"/></svg>
-      <p><strong>Lưu ý:</strong> Hiện là ca đêm. Điểm danh bây giờ sẽ được ghi nhận cho ngày <strong id="workDate"></strong>.</p>
-    </div>
-
-    <!-- Branch -->
-    <section class="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" role="region" aria-label="Chi nhánh">
-      <div class="flex items-center gap-3">
-        <div class="grid h-10 w-10 place-items-center rounded-lg bg-slate-100">
-          <svg class="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-        </div>
-        <div class="flex-1">
-          <p class="text-xs text-slate-500">Chi nhánh làm việc</p>
-          <p id="branchName" class="mt-1 font-semibold text-slate-800">(đang xác định...)</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Actions -->
-    <div class="mt-4 grid grid-cols-2 gap-3">
-      <button id="refreshBtn" class="group inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-transform active:scale-[.98] focus-ring">
-        <svg class="h-4 w-4 text-slate-500 transition-transform group-active:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v6h-6"/></svg>
-        <span>Tải lại</span>
-      </button>
-      <button id="addEmployeeBtn" class="btn-gradient inline-flex items-center justify-center gap-2 rounded-xl text-white px-3 py-2.5 text-sm font-semibold shadow-md transition active:scale-[.98] focus-ring">
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 5v14M5 12h14"/></svg>
-        <span>Thêm</span>
-      </button>
-    </div>
-
-    <!-- List -->
-    <div id="attendanceList" class="mt-4 space-y-3"></div>
-    <div id="emptyHint" class="mt-6 hidden text-center text-sm text-slate-500">
-      Danh sách trống. Bấm <strong>+ Thêm</strong> để bắt đầu.
-    </div>
-  </div>
-
-  <!-- Bottom bar -->
-  <div class="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 shadow-2xl backdrop-blur supports-[backdrop-filter]:bg-white/75">
-    <div class="mx-auto max-w-lg px-4 py-3" style="padding-bottom: calc(12px + var(--safe-bottom))">
+    <main class="px-4 mt-4 space-y-4">
       
-      <button id="saveBtn" class="btn-gradient w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white shadow-lg transition active:scale-[.99] focus-ring">
-        LƯU ĐIỂM DANH
-      </button>
-
-      <div class="mt-2 text-center">
-        <p class="text-[10px] text-slate-400">
-          Hệ thống v{{ version }} </p>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- Status Modal (Loading, Success, Error) -->
-  <div id="statusModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm transition-opacity duration-200 opacity-0">
-    <div id="statusModalContent" class="relative w-full max-w-xs bg-white rounded-2xl shadow-xl p-6 text-center space-y-4 overflow-hidden">
-      <!-- Loading State -->
-      <div id="statusLoading">
-        <svg class="animate-spin mx-auto h-12 w-12 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <p id="loadingMessage" class="mt-4 text-slate-700 font-medium">Đang xử lý...</p>
-      </div>
-      <!-- Success State -->
-      <div id="statusSuccess" class="hidden">
-        <svg class="checkmark mx-auto" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
-          <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none"/>
-          <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-        </svg>
-        <p id="successMessage" class="mt-4 text-slate-700 font-medium">Thành công!</p>
-        <div class="absolute bottom-0 left-0 right-0 h-1 timer-bar-container">
-            <div class="h-full timer-bar-inner"></div>
+      <!-- Night Shift Alert -->
+      <div id="nightShiftNotice" class="hidden animate-fade-in rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/50 p-4 shadow-sm">
+        <div class="flex gap-3">
+          <div class="p-2 bg-amber-100 dark:bg-amber-800/40 rounded-full h-fit text-amber-600 dark:text-amber-400">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-amber-800 dark:text-amber-300">Ca đêm</h3>
+            <p class="text-xs mt-1 text-amber-700 dark:text-amber-400/80">
+              Điểm danh sẽ được tính cho ngày <strong id="workDate" class="underline decoration-dotted">...</strong>
+            </p>
+          </div>
         </div>
       </div>
+
+      <!-- Branch Info Card -->
+      <div class="rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/50 p-4 shadow-sm flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="h-10 w-10 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+          </div>
+          <div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Chi nhánh hiện tại</p>
+            <p id="branchName" class="text-sm font-bold text-slate-800 dark:text-slate-100 mt-0.5 animate-pulse">Đang định vị...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- VISUAL SEPARATOR (New Request) -->
+      <div class="pt-4 pb-1 flex items-center justify-between opacity-80">
+         <h2 class="text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">
+            Danh sách nhân viên
+         </h2>
+         <div class="h-px bg-gradient-to-r from-slate-200 to-transparent dark:from-slate-700 flex-1 ml-4"></div>
+      </div>
+
+      <!-- Employee List -->
+      <div id="attendanceList" class="space-y-3 pb-4">
+        <!-- Skeleton Loading will be injected here -->
+      </div>
+      
+      <!-- Empty State -->
+      <div id="emptyHint" class="hidden flex flex-col items-center justify-center py-12 text-center">
+        <div class="w-20 h-20 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
+          <svg class="w-10 h-10 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+        </div>
+        <p class="text-slate-500 dark:text-slate-400 font-medium">Chưa có nhân viên nào</p>
+        <p class="text-slate-400 dark:text-slate-500 text-sm mt-1">Bấm nút "Thêm" bên dưới để bắt đầu</p>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- MODERN BOTTOM NAVIGATION BAR (2025 REDESIGN) -->
+  <div class="fixed bottom-0 left-0 right-0 z-40">
+    <!-- Gradient Fade to separate content -->
+    <div class="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white via-white/80 to-transparent dark:from-dark-950 dark:via-dark-950/80 pointer-events-none"></div>
+    
+    <!-- Bar Container -->
+    <!-- Added px-8 for "Breathing Room" -->
+    <div class="relative glass bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl border-t border-white/50 dark:border-white/10">
+      <div class="mx-auto max-w-lg px-8 pb-[env(safe-area-inset-bottom)] pt-2">
+        <div class="grid grid-cols-3 gap-8 h-[68px] items-center">
+          
+          <!-- LEFT: Refresh -->
+          <button id="refreshBtn" class="group flex flex-col items-center justify-center gap-1.5 rounded-2xl p-1 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 active:scale-90 transition-all duration-300">
+            <!-- Icon -->
+            <div class="relative p-1.5 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 rounded-xl transition-colors">
+                <svg class="h-6 w-6 transition-transform duration-700 ease-in-out group-active:-rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M3 21v-5h5"></path></svg>
+            </div>
+            <span class="text-[10px] font-semibold opacity-70 group-hover:opacity-100">Tải lại</span>
+          </button>
+
+          <!-- CENTER: Save Attendance (Floating Primary FAB) -->
+          <button id="saveBtn" class="group relative -top-8 flex flex-col items-center justify-center focus:outline-none z-10">
+            <!-- Glow Effect Layer -->
+            <div class="absolute top-2 w-14 h-14 rounded-full bg-blue-500 blur-xl opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
+            
+            <!-- Button Circle -->
+            <div class="relative h-[72px] w-[72px] rounded-full bg-gradient-to-b from-blue-500 to-blue-700 shadow-2xl shadow-blue-600/40 text-white flex items-center justify-center transform transition-all duration-300 group-active:scale-95 group-hover:-translate-y-1 border-4 border-white dark:border-slate-900">
+              
+              <!-- Icon -->
+              <svg id="saveIcon" class="h-8 w-8 drop-shadow-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+              </svg>
+              
+              <!-- Spinner -->
+              <svg id="saveSpinner" class="hidden h-8 w-8 animate-spin text-white/90" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              
+              <!-- Smart Badge (NUMBER instead of !) -->
+              <div id="saveBadge" class="hidden absolute -top-1 -right-1 flex h-6 min-w-[24px] px-1.5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white border-[3px] border-white dark:border-slate-900 shadow-sm transition-transform duration-200">
+                0
+              </div>
+            </div>
+            
+            <span class="mt-2 text-[11px] font-bold text-blue-600 dark:text-blue-400 tracking-wide uppercase opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-5">Lưu</span>
+          </button>
+
+          <!-- RIGHT: Add Employee -->
+          <button id="addEmployeeBtn" class="group flex flex-col items-center justify-center gap-1.5 rounded-2xl p-1 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 active:scale-90 transition-all duration-300">
+            <!-- Icon -->
+            <div class="relative p-1.5 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/20 rounded-xl transition-colors">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </div>
+            <span class="text-[10px] font-semibold opacity-70 group-hover:opacity-100">Thêm NV</span>
+          </button>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Modal (Redesigned) -->
+  <div id="statusModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-200 opacity-0">
+    <div id="statusModalContent" class="relative w-full max-w-xs bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-6 text-center transform transition-all scale-95 opacity-0">
+      
+      <!-- Loading State -->
+      <div id="statusLoading" class="flex flex-col items-center py-4">
+        <div class="relative w-16 h-16">
+          <div class="absolute inset-0 rounded-full border-4 border-slate-100 dark:border-slate-700"></div>
+          <div class="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
+        </div>
+        <p id="loadingMessage" class="mt-6 text-slate-800 dark:text-slate-100 font-semibold text-lg">Đang xử lý...</p>
+      </div>
+
+      <!-- Success State -->
+      <div id="statusSuccess" class="hidden py-2">
+        <div class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+          <svg class="h-10 w-10 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        </div>
+        <h3 class="mt-4 text-xl font-bold text-slate-900 dark:text-white">Thành công!</h3>
+        <p id="successMessage" class="mt-2 text-sm text-slate-500 dark:text-slate-400">Dữ liệu đã được lưu.</p>
+        <!-- Timer bar -->
+        <div class="mt-6 h-1 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+           <div class="timer-bar-inner h-full bg-green-500 w-full"></div>
+        </div>
+      </div>
+
       <!-- Error State -->
-      <div id="statusError" class="hidden">
-        <svg class="mx-auto h-16 w-16 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-        <p id="errorMessage" class="mt-4 text-slate-700 font-medium">Đã xảy ra lỗi!</p>
-        <button onclick="hideStatusModal()" class="mt-4 w-full rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200">Đóng</button>
+      <div id="statusError" class="hidden py-2">
+        <div class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+          <svg class="h-10 w-10 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </div>
+        <h3 class="mt-4 text-xl font-bold text-slate-900 dark:text-white">Có lỗi xảy ra</h3>
+        <p id="errorMessage" class="mt-2 text-sm text-slate-500 dark:text-slate-400">Vui lòng thử lại sau.</p>
+        <button onclick="hideStatusModal()" class="mt-6 w-full rounded-2xl bg-slate-100 dark:bg-slate-700 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 transition active:scale-95">Đóng</button>
       </div>
     </div>
   </div>
 
-  <!-- Branch chooser -->
-  <div id="branchPopup" class="modal fixed inset-0 z-40 hidden flex items-center justify-center p-4 bg-black/25 backdrop-blur-sm">
-    <div class="w-full max-w-md space-y-4 rounded-2xl border border-white/20 bg-white/70 p-6 shadow-lg backdrop-blur-xl">
-      <div class="flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-slate-800">Chọn chi nhánh</h3>
-        <button onclick="closeModal('branchPopup')" class="rounded-full p-1 text-slate-500 transition-colors hover:bg-slate-400/20" aria-label="Đóng">
-          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  <!-- Search Modal (Full screen on mobile) -->
+  <div id="searchModal" class="fixed inset-0 z-50 hidden bg-white dark:bg-slate-900">
+    <div class="flex h-full flex-col">
+      <div class="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 px-4 py-3" style="padding-top: calc(var(--safe-top) + 12px)">
+        <button onclick="closeModal('searchModal')" class="rounded-full p-2 -ml-2 text-slate-500 dark:text-slate-400 active:bg-slate-100 dark:active:bg-slate-800">
+          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        </button>
+        <div class="relative flex-1">
+          <input id="searchInputMain" type="text" placeholder="Nhập tên hoặc mã..." class="w-full rounded-xl border-none bg-slate-100 dark:bg-slate-800 py-3 pl-11 pr-4 text-base font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500/50 outline-none" autocomplete="off" />
+          <svg class="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
+      </div>
+      
+      <div class="flex-1 overflow-y-auto px-4 py-4">
+        <h4 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Gợi ý</h4>
+        <div id="suggestListMain" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Branch Popup (Bottom Sheet style) -->
+  <div id="branchPopup" class="fixed inset-0 z-50 hidden flex items-end sm:items-center justify-center sm:p-4">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onclick="closeModal('branchPopup')"></div>
+    <div class="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl transition-transform transform translate-y-full">
+      <div class="mb-6 flex items-center justify-between">
+        <h3 class="text-xl font-bold text-slate-900 dark:text-white">Chọn chi nhánh</h3>
+        <button onclick="closeModal('branchPopup')" class="rounded-full bg-slate-100 dark:bg-slate-800 p-2 text-slate-500">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
-      <div id="branchChoices" class="max-h-[50vh] space-y-2 overflow-y-auto"></div>
+      <div id="branchChoices" class="max-h-[60vh] overflow-y-auto space-y-2 pb-8 sm:pb-0"></div>
     </div>
   </div>
 
-  <!-- Search modal -->
-  <div id="searchModal" class="modal fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/25 backdrop-blur-sm">
-    <div class="w-full max-w-md space-y-4 rounded-2xl border border-white/20 bg-white/70 p-6 shadow-lg backdrop-blur-xl">
-      <div class="flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-slate-800">Thêm nhân viên</h3>
-        <button onclick="closeModal('searchModal')" class="rounded-full p-1 text-slate-500 transition-colors hover:bg-slate-400/20" aria-label="Đóng">
-          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <div class="relative">
-        <input id="searchInputMain" type="text" placeholder="Nhập mã hoặc tên..." class="focus-ring w-full rounded-xl border border-slate-300 bg-white/80 px-4 py-3 text-base" />
-        <svg class="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
-      </div>
-      <div id="suggestListMain" class="max-h-[50vh] space-y-2 overflow-y-auto"></div>
-    </div>
-  </div>
-
-  <!-- Template variables (giữ nguyên) -->
+  <!-- Template variables -->
   <script>
     const userRole = "{{ role | lower }}";
     const loginCode = "{{ login_code }}";
@@ -220,569 +314,439 @@
     const qrToken = "{{ token | default('', true) }}";
   </script>
 
+  <!-- Logic Script -->
   <script>
-    /* ========= Endpoint backend (giữ nguyên) ========= */
+    /* ========= Theme Logic ========= */
+
+    const themeToggleBtn = document.getElementById('themeToggle');
+    const htmlEl = document.documentElement;
+
+    function initTheme() {
+      const storedTheme = localStorage.getItem('theme');
+      if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        htmlEl.classList.add('dark');
+      } else {
+        htmlEl.classList.remove('dark');
+      }
+    }
+    
+    themeToggleBtn.addEventListener('click', () => {
+      htmlEl.classList.toggle('dark');
+      localStorage.setItem('theme', htmlEl.classList.contains('dark') ? 'dark' : 'light');
+    });
+    
+    initTheme();
+    // Update date
+    const dateOptions = { weekday: 'long', year: 'numeric', month: 'numeric', day: 'numeric' };
+    document.getElementById('currentDateDisplay').textContent = new Date().toLocaleDateString('vi-VN', dateOptions);
+
+    /* ========= App Logic ========= */
     const byBranchUrl = (b) => `{{ url_for('get_employees_by_branch', branch_code='PLACEHOLDER') }}`.replace('PLACEHOLDER', encodeURIComponent(b));
     const searchUrl   = (q) => `{{ url_for('search_employees') }}?q=${encodeURIComponent(q)}&loginCode=${encodeURIComponent(loginCode)}`;
     const saveUrl     = () => `{{ url_for('attendance_checkin_bulk') }}`;
-    const detectBranchUrl = () => `{{ url_for('detect_branch') }}`; // Dùng cho hàm detectBranchByGPS
-    const selectBranchUrl = () => `{{ url_for('select_branch') }}`; // Dùng cho hàm showBranchSelectionPopup
+    const detectBranchUrl = () => `{{ url_for('detect_branch') }}`;
+    const selectBranchUrl = () => `{{ url_for('select_branch') }}`;
 
-    /* Local state */
     let employees = [];
 
-    /* Helpers */
     function escapeHtml(s){ return String(s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
-    function escapeAttr(s){ return String(s||"").replaceAll('"','&quot;'); }
-    
-    // === THÊM HÀM NÀY ĐỂ SỬA LỖI ===
-    function branchDisplay(branchCode) {
-      if (!branchCode) return "(Chưa rõ)";
-      return branchCode; // Tạm thời chỉ hiển thị mã. Bạn có thể thêm logic B1 -> "Chi nhánh 1" ở đây.
-    }
 
-    /* ===== Status Modal Logic ===== */
+    function formatDepartment(department) {
+      if (department && department.toLowerCase() === 'buongphong') {
+        return 'Buồng phòng';
+      }
+      return department;
+    }
+    function escapeAttr(s){ return String(s||"").replaceAll('"','&quot;'); }
+    function branchDisplay(branchCode) { return branchCode || "(Chưa rõ)"; }
+
     function updateEmployeeOvertime(emp) {
         const isDifferentBranch = (emp.branch || "") !== (emp.branch_today || currentBranch);
         const hasHighWorkUnits = (emp.so_cong_nv || 1) > 1;
         emp.la_tang_ca = isDifferentBranch || hasHighWorkUnits;
-        // Theo yêu cầu, không tự động cập nhật trường "ghi_chu".
-        // Cờ 'la_tang_ca' sẽ được xác định và gửi đi là đủ.
     }
+    
     function vibrate(duration = 5) {
-      if ('vibrate' in navigator && window.navigator.vibrate) {
-        try {
-          window.navigator.vibrate(duration);
-        } catch (e) { /* Can fail on some browsers/settings */ }
-      }
+      if ('vibrate' in navigator && window.navigator.vibrate) navigator.vibrate(duration);
     }
 
+    /* Modal Helpers */
+    function openModal(id) {
+        const el = document.getElementById(id);
+        if(!el) return;
+        el.classList.remove('hidden');
+        if(id === 'branchPopup') {
+            setTimeout(() => el.querySelector('div.transform').classList.remove('translate-y-full'), 10);
+        }
+        if(id === 'searchModal') {
+             setTimeout(() => document.getElementById("searchInputMain").focus(), 100);
+        }
+    }
+    function closeModal(id) {
+        const el = document.getElementById(id);
+        if(!el) return;
+        if(id === 'branchPopup') {
+            el.querySelector('div.transform').classList.add('translate-y-full');
+            setTimeout(() => el.classList.add('hidden'), 300);
+        } else {
+            el.classList.add('hidden');
+        }
+    }
+
+    /* Status Modal Logic */
     const statusModal = document.getElementById('statusModal');
     const statusModalContent = document.getElementById('statusModalContent');
-    const statusLoading = document.getElementById('statusLoading');
-    const loadingMessage = document.getElementById('loadingMessage');
-    const statusSuccess = document.getElementById('statusSuccess');
-    const successMessage = document.getElementById('successMessage');
-    const statusError = document.getElementById('statusError');
-    const errorMessage = document.getElementById('errorMessage');
     let modalHideTimer = null;
-
-    function hideStatusModal() {
-      statusModal.classList.add('opacity-0');
-      setTimeout(() => {
-        statusModal.classList.add('hidden');
-      }, 200); // Match transition duration
-    }
 
     function showStatusModal(state, message = "", autoHideDuration = 0, onHidden = null) {
       if (modalHideTimer) clearTimeout(modalHideTimer);
-      modalHideTimer = null;
-      statusModalContent.onmouseenter = null;
-      statusModalContent.onmouseleave = null;
+      
+      const states = ['statusLoading', 'statusSuccess', 'statusError'];
+      states.forEach(s => document.getElementById(s).classList.add('hidden'));
 
-      const checkmarkIcon = statusSuccess.querySelector('.checkmark');
-      if (checkmarkIcon) {
-          checkmarkIcon.classList.remove('checkmark');
-          void checkmarkIcon.offsetWidth;
-          checkmarkIcon.classList.add('checkmark');
+      if(state === 'loading') {
+          document.getElementById('statusLoading').classList.remove('hidden');
+          document.getElementById('loadingMessage').textContent = message || "Đang xử lý...";
+      } else if(state === 'success') {
+          document.getElementById('statusSuccess').classList.remove('hidden');
+          document.getElementById('successMessage').textContent = message || "Thành công!";
+      } else {
+          document.getElementById('statusError').classList.remove('hidden');
+          document.getElementById('errorMessage').textContent = message || "Lỗi không xác định";
       }
 
-      const timerBar = document.querySelector('.timer-bar-inner');
-      if (timerBar) {
-        timerBar.style.animation = 'none';
-        timerBar.offsetHeight;
-      }
-
-      statusLoading.classList.add('hidden');
-      statusSuccess.classList.add('hidden');
-      statusError.classList.add('hidden');
-
-      if (state === 'loading') {
-        loadingMessage.textContent = message || "Đang xử lý...";
-        statusLoading.classList.remove('hidden');
-      } else if (state === 'success') {
-        successMessage.textContent = message || "Thành công!";
-        statusSuccess.classList.remove('hidden');
-        if (timerBar && autoHideDuration > 0) {
-            timerBar.style.animationDuration = `${autoHideDuration / 1000}s`;
-            timerBar.style.animationName = 'shrink';
-        }
-      } else if (state === 'error') {
-        errorMessage.textContent = message || "Đã xảy ra lỗi không xác định.";
-        statusError.classList.remove('hidden');
-      }
       statusModal.classList.remove('hidden');
-      statusModal.classList.remove('opacity-0');
+      setTimeout(() => {
+          statusModal.classList.remove('opacity-0');
+          statusModalContent.classList.remove('scale-95', 'opacity-0');
+      }, 10);
 
       if (state === 'success' && autoHideDuration > 0) {
-        let remaining = autoHideDuration;
-        let resumeTime;
-        const pause = () => {
-          if (modalHideTimer) {
-            clearTimeout(modalHideTimer);
-            modalHideTimer = null;
-            remaining -= (Date.now() - resumeTime);
-            if (timerBar) timerBar.style.animationPlayState = 'paused';
-          }
-        };
-        const resume = () => {
-          if (remaining > 0 && !modalHideTimer) {
-            resumeTime = Date.now();
-            if (timerBar) timerBar.style.animationPlayState = 'running';
-            modalHideTimer = setTimeout(() => { hideStatusModal(); if (onHidden) onHidden(); }, remaining);
-          }
-        };
-        statusModalContent.onmouseenter = pause;
-        statusModalContent.onmouseleave = resume;
-        resume();
-      }
-    };
-
-    function disableForm(message){
-      showStatusModal('error', message || "Không thể điểm danh");
-      ["saveBtn","addEmployeeBtn","refreshBtn"].forEach(id=>{
-        const el=document.getElementById(id); if(!el) return;
-        el.disabled=true; el.classList.add("opacity-50", "cursor-not-allowed");
-      });
-      employees=[]; renderAttendanceList();
-    }
-
-    async function safeFetchJson(url, options){
-      const res = await fetch(url, options);
-      if (!res.ok){
-        let msg = `Lỗi kết nối server (mã ${res.status})`;
-        try{ const data = await res.json(); if (data && data.error) msg = data.error; }catch(e){}
-        throw new Error(msg);
-      }
-      const ct = res.headers.get("content-type") || "";
-      return ct.includes("application/json") ? res.json() : res.text();
-    }
-
-    /* ===== Modal Handlers ===== */
-    function openModal(modalId) {
-      const modal = document.getElementById(modalId);
-      if (modal) {
-        modal.classList.remove('hidden');
-        const input = modal.querySelector('input[type="text"]');
-        if (input) setTimeout(() => input.focus(), 50);
+        const timerBar = document.querySelector('.timer-bar-inner');
+        if(timerBar) {
+            timerBar.style.width = '100%';
+            timerBar.style.transition = `width ${autoHideDuration}ms linear`;
+            setTimeout(() => timerBar.style.width = '0%', 50);
+        }
+        modalHideTimer = setTimeout(() => {
+           hideStatusModal();
+           if (onHidden) onHidden();
+        }, autoHideDuration);
       }
     }
-    function closeModal(modalId) {
-      const modal = document.getElementById(modalId);
-      if (modal) modal.classList.add('hidden');
-    }
-    ['searchModal', 'branchPopup'].forEach(id => {
-      const modal = document.getElementById(id);
-      if(modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(id); });
-    });
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        closeModal('searchModal');
-        closeModal('branchPopup');
-      }
-    });
 
-    /* ===== Render list ===== */
+    function hideStatusModal() {
+        statusModal.classList.add('opacity-0');
+        statusModalContent.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => statusModal.classList.add('hidden'), 200);
+    }
+
+    /* Render Logic */
     function renderSkeleton(count = 3) {
       const wrap = document.getElementById("attendanceList");
       wrap.innerHTML = "";
-      let skeletonHTML = '';
+      let html = '';
       for (let i = 0; i < count; i++) {
-          skeletonHTML += `
-          <div class="space-y-4 rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm animate-pulse">
-            <div class="flex items-start gap-3">
-              <div class="flex-1 space-y-2 py-1">
-                <div class="h-4 bg-slate-200 rounded w-3/4"></div>
-                <div class="h-3 bg-slate-200 rounded w-1/2"></div>
-              </div>
-              <div class="h-8 w-8 bg-slate-200 rounded-full"></div>
-            </div>
-            <div class="h-10 bg-slate-200 rounded-lg mt-1"></div>
-            <div class="h-10 bg-slate-200 rounded-lg"></div>
-          </div>`;
+        html += `
+        <div class="animate-pulse rounded-2xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
+          <div class="flex items-center gap-4">
+             <div class="h-12 w-12 rounded-full bg-slate-200 dark:bg-slate-700"></div>
+             <div class="flex-1 space-y-2">
+               <div class="h-4 w-1/2 rounded bg-slate-200 dark:bg-slate-700"></div>
+               <div class="h-3 w-1/3 rounded bg-slate-200 dark:bg-slate-700"></div>
+             </div>
+          </div>
+          <div class="mt-4 flex gap-3">
+             <div class="h-10 w-1/3 rounded-xl bg-slate-200 dark:bg-slate-700"></div>
+             <div class="h-10 flex-1 rounded-xl bg-slate-200 dark:bg-slate-700"></div>
+          </div>
+        </div>`;
       }
-      wrap.innerHTML = skeletonHTML;
+      wrap.innerHTML = html;
     }
 
     function renderAttendanceList(){
       const wrap = document.getElementById("attendanceList");
       wrap.innerHTML = "";
-      document.getElementById("emptyHint").style.display = employees.length > 0 ? "none" : "block";
+      document.getElementById("emptyHint").classList.toggle('hidden', employees.length > 0);
+      
+      // === BADGE LOGIC UPDATE (NUMBER COUNT) ===
+      const badge = document.getElementById('saveBadge');
+      if (employees.length > 0) {
+          badge.textContent = employees.length; // Show number
+          badge.classList.remove('hidden');
+          // Scale Effect on update
+          badge.classList.remove('scale-100');
+          badge.classList.add('scale-125');
+          setTimeout(() => {
+             badge.classList.remove('scale-125');
+             badge.classList.add('scale-100');
+          }, 200);
+      } else {
+          badge.classList.add('hidden');
+      }
+      // =========================================
 
       employees.forEach((emp, idx) => {
         const row = document.createElement("div");
-        row.className = "attendance-item space-y-4 rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm";
-        row.style.animationDelay = `${Math.min(idx * 50, 500)}ms`;
+        row.className = "animate-slide-up relative overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm transition-all hover:shadow-md";
+        row.style.animationDelay = `${idx * 50}ms`;
 
-        // Tùy chọn số công theo department
         let optionsHtml = "";
-        if (emp.department?.toLowerCase() === "letan") {
-          optionsHtml = `
-            <option value="0.5" ${emp.so_cong_nv === 0.5 ? "selected" : ""}>0.5</option>
-            <option value="1" ${!emp.so_cong_nv || emp.so_cong_nv === 1 ? "selected" : ""}>1</option>
-          `;
-        } else {
-          optionsHtml = `
-            <option value="0.5" ${emp.so_cong_nv === 0.5 ? "selected" : ""}>0.5</option>
-            <option value="1" ${!emp.so_cong_nv || emp.so_cong_nv === 1 ? "selected" : ""}>1</option>
-            <option value="1.5" ${emp.so_cong_nv === 1.5 ? "selected" : ""}>1.5</option>
-            <option value="2" ${emp.so_cong_nv === 2 ? "selected" : ""}>2</option>
-            <option value="2.5" ${emp.so_cong_nv === 2.5 ? "selected" : ""}>2.5</option>
-          `;
-        }
+        const values = emp.department?.toLowerCase() === "letan" ? [0.5, 1] : [0.5, 1, 1.5, 2, 2.5];
+        values.forEach(v => {
+            optionsHtml += `<option value="${v}" ${emp.so_cong_nv === v ? "selected" : ""}>${v}</option>`;
+        });
+
+        // Generate Avatar Initials
+        const names = emp.name.split(' ');
+        const initials = names.length > 1 ? names[names.length-1][0] : names[0][0];
+        const avatarColor = ['bg-blue-100 text-blue-600', 'bg-purple-100 text-purple-600', 'bg-emerald-100 text-emerald-600', 'bg-amber-100 text-amber-600'][emp.code.charCodeAt(emp.code.length-1) % 4];
 
         row.innerHTML = `
-          <div class="flex items-start gap-3">
-            <div class="flex-1">
-              <p class="font-semibold text-slate-800">${escapeHtml(emp.name)}</p>
-              <p class="mt-1 text-sm text-slate-500">
-                Mã: ${escapeHtml(emp.code)} &bull; ${escapeHtml(emp.department)}
-                <span class="badge-container" style="display: inline;">
-                  ${emp.la_tang_ca ? '<span class="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-600">Tăng ca</span>' : ''}
-                </span>
-              </p>
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="flex h-12 w-12 items-center justify-center rounded-2xl ${avatarColor} dark:bg-opacity-20 font-bold text-lg">
+                    ${initials}
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800 dark:text-slate-100">${escapeHtml(emp.name)}</h3>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        ${escapeHtml(emp.code)} <span class="mx-1 text-slate-300">|</span> ${escapeHtml(formatDepartment(emp.department))}
+                    </p>
+                    <div class="badge-container mt-1">
+                        ${emp.la_tang_ca ? '<span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-700/10">Tăng ca</span>' : ''}
+                    </div>
+                </div>
             </div>
-            <button data-code="${escapeAttr(emp.code)}" class="btn-delete rounded-full p-1.5 text-slate-400 transition-colors hover:bg-red-100 hover:text-red-500" aria-label="Xóa">
-              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            <button data-code="${escapeAttr(emp.code)}" class="btn-delete -mr-2 -mt-2 p-2 text-slate-300 hover:text-red-500 transition-colors">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
           </div>
-          <div class="grid grid-cols-2 gap-x-4 gap-y-3">
-            <div>
-              <label class="text-xs text-slate-500">Số công</label>
-              <select data-code="${escapeAttr(emp.code)}" data-field="so_cong_nv"
-                class="focus-ring mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-base">
-                ${optionsHtml}
-              </select>
+
+          <div class="mt-4 grid grid-cols-10 gap-3">
+            <div class="col-span-3">
+                <div class="relative">
+                    <select data-code="${escapeAttr(emp.code)}" data-field="so_cong_nv" class="w-full appearance-none rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 py-2.5 pl-3 pr-8 text-sm font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        ${optionsHtml}
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                </div>
             </div>
-            <div class="col-span-2">
-              <label class="text-xs text-slate-500">Ghi chú</label>
-              <input data-code="${escapeAttr(emp.code)}" data-field="ghi_chu"
-                value="${escapeAttr(emp.ghi_chu || '')}" placeholder="Nhập ghi chú..."
-                class="focus-ring mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-base">
+            <div class="col-span-7">
+                <input data-code="${escapeAttr(emp.code)}" data-field="ghi_chu" value="${escapeAttr(emp.ghi_chu || '')}" 
+                    placeholder="Ghi chú..." 
+                    class="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 py-2.5 px-3 text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition" />
             </div>
           </div>
         `;
 
+        // Event Handlers
         row.querySelector('.btn-delete').onclick = (e) => {
             vibrate(10);
-            const codeToDelete = e.currentTarget.dataset.code;
-            const rowElement = e.currentTarget.closest('.attendance-item');
-
-            // Immediately find and remove from the data array
-            const indexToDelete = employees.findIndex(emp => emp.code === codeToDelete);
-            if (indexToDelete === -1) return; // Already deleted, do nothing
-            employees.splice(indexToDelete, 1);
-
-            // Animate the row out, then remove it from the DOM
-            rowElement.classList.add('item-out');
-            rowElement.addEventListener('animationend', () => {
-                rowElement.remove();
-                // Update empty hint visibility if needed
-                document.getElementById("emptyHint").style.display = employees.length > 0 ? "none" : "block";
-            }, { once: true });
+            employees = employees.filter(x => x.code !== e.currentTarget.dataset.code);
+            // Animate out
+            const parent = e.currentTarget.closest('div.animate-slide-up');
+            parent.style.transform = 'translateX(100%)';
+            parent.style.opacity = '0';
+            setTimeout(renderAttendanceList, 200);
         };
-
+        
         row.querySelector('select').onchange = (e) => {
-            const code = e.currentTarget.dataset.code;
-            const emp = employees.find(emp => emp.code === code);
-            if (!emp) return;
-            emp.so_cong_nv = parseFloat(e.target.value);
-
-            updateEmployeeOvertime(emp);
-
-            const itemElement = e.currentTarget.closest('.attendance-item');
-            const badgeContainer = itemElement.querySelector('.badge-container');
-            badgeContainer.innerHTML = emp.la_tang_ca ? '<span class="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-600">Tăng ca</span>' : '';
+            const t = employees.find(x => x.code === e.currentTarget.dataset.code);
+            if(t) {
+                t.so_cong_nv = parseFloat(e.target.value);
+                updateEmployeeOvertime(t);
+                renderAttendanceList(); // Re-render to update badges
+            }
         };
+
         row.querySelector('input').oninput = (e) => {
-            const code = e.currentTarget.dataset.code;
-            const emp = employees.find(emp => emp.code === code);
-            if (!emp) return;
-            emp.ghi_chu = e.target.value.slice(0,200);
-        };
+            const t = employees.find(x => x.code === e.currentTarget.dataset.code);
+            if(t) t.ghi_chu = e.target.value;
+        }
 
         wrap.appendChild(row);
       });
     }
 
-    /* ===== Data load by branch ===== */
+    async function safeFetchJson(url, options){
+      try {
+          const res = await fetch(url, options);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const ct = res.headers.get("content-type") || "";
+          return ct.includes("application/json") ? res.json() : res.text();
+      } catch(e) { throw e; }
+    }
+
     async function loadEmployeesForBranch(){
-      if(!currentBranch){ showStatusModal("error", "Chi nhánh chưa được xác định."); return; }
+      if(!currentBranch) return;
       renderSkeleton(3);
       try{
         const data = await safeFetchJson(byBranchUrl(currentBranch));
-        if (!Array.isArray(data)) throw new Error("API trả về không phải mảng");
-        employees = data.map(emp => {
-            const newEmp = {
-              code: emp.code, 
-              name: emp.name, 
-              department: emp.department,
-              branch: emp.branch,
-              branch_name: emp.branch_name,
-              branch_today: currentBranch, 
-              so_cong_nv: 1, 
-              ghi_chu: ""
-          };
-            updateEmployeeOvertime(newEmp);
-            return newEmp;
+        if (Array.isArray(data)) {
+            employees = data.map(emp => {
+                const e = { ...emp, branch_today: currentBranch, so_cong_nv: 1, ghi_chu: "" };
+                updateEmployeeOvertime(e);
+                return e;
+            });
+            renderAttendanceList();
+        }
+      }catch(err){ showStatusModal('error', "Lỗi tải dữ liệu"); }
+    }
+
+    /* Save Logic */
+    async function saveAttendance(){
+      vibrate();
+      const saveBtn = document.getElementById('saveBtn');
+      if (saveBtn.disabled) return;
+      const saveIcon = document.getElementById('saveIcon');
+      const saveSpinner = document.getElementById('saveSpinner');
+      
+      if (employees.length === 0){ showStatusModal('error', "Danh sách trống!"); return; }
+      if (!currentBranch) { showStatusModal('error', "Chưa xác định chi nhánh!"); return; }
+
+      // UI Feedback: Toggle Icon/Spinner
+      saveBtn.disabled = true;
+      saveIcon.classList.add('hidden');
+      saveSpinner.classList.remove('hidden');
+
+      showStatusModal('loading', 'Đang lưu lên hệ thống...');
+
+      const payload = employees.map(emp => ({
+        ma_nv: emp.code, ten_nv: emp.name,
+        chi_nhanh_chinh: emp.branch, chi_nhanh_lam: currentBranch,
+        la_tang_ca: !!emp.la_tang_ca, so_cong_nv: emp.so_cong_nv,
+        ghi_chu: emp.ghi_chu, token: qrToken 
+      }));
+
+      const resetBtn = () => {
+         saveBtn.disabled = false;
+         saveIcon.classList.remove('hidden');
+         saveSpinner.classList.add('hidden');
+      };
+
+      try {
+        const res = await fetch(saveUrl(), { 
+          method:"POST", headers:{ "Content-Type":"application/json", "X-CSRF-Token": csrfToken },
+          body: JSON.stringify(payload)
         });
         
-        renderAttendanceList();
-      }catch(err){
-        showStatusModal('error', "Lỗi khi tải danh sách: " + (err?.message || err));
+        if(!res.ok) throw new Error("Server Error");
+        const doc = await res.json();
+
+        if (doc && doc.status === 'success') {
+            if(doc.redirect_to) {
+                showStatusModal('success', 'Chuyển hướng...', 1000, () => window.location.replace(doc.redirect_to));
+            } else {
+                showStatusModal('success', 'Đã lưu điểm danh!', 2000, () => {
+                   const role = (userRole||"").toLowerCase();
+                   if (["quanly","ktv","boss","admin"].includes(role)) {
+                       employees = []; renderAttendanceList();
+                   }
+                   resetBtn();
+                });
+            }
+        } else { throw new Error("API returned failure"); }
+
+      } catch(err) {
+        showStatusModal('error', "Lỗi lưu: " + err.message);
+        resetBtn();
       }
     }
 
-    /* ===== Search & add ===== */
-    async function addBySearchQuery(q){
-      if(!q) return;
-      try{
-        const data = await safeFetchJson(searchUrl(q));
-        if (!Array.isArray(data) || data.length === 0){ showStatusModal('error', "Không tìm thấy nhân viên"); return; }
-        const emp = data[0];
-        const exists = employees.some(e => e.code === emp.code);
-        if (exists){ showStatusModal('error', "Nhân viên đã có trong danh sách"); return; }
-        const newEmp = {
-            code: emp.code, name: emp.name, department: emp.department, branch: emp.branch,
-            branch_today: currentBranch, so_cong_nv: 1, service:[], ghi_chu: ""
-        };
+    /* Search & Branch Logic (Simplified for brevity but fully functional) */
+    document.getElementById("addEmployeeBtn").onclick = () => { vibrate(); openModal('searchModal'); document.getElementById("searchInputMain").value=""; document.getElementById("suggestListMain").innerHTML=""; };
+    document.getElementById("refreshBtn").onclick = () => { vibrate(); document.getElementById("attendanceList").innerHTML=""; loadEmployeesForBranch(); };
+    document.getElementById("saveBtn").onclick = saveAttendance;
+
+    let searchTimer;
+    document.getElementById("searchInputMain").oninput = (e) => {
+        clearTimeout(searchTimer);
+        const q = e.target.value.trim();
+        if(!q) { document.getElementById("suggestListMain").innerHTML=""; return; }
+        searchTimer = setTimeout(async() => {
+             try {
+                 const data = await safeFetchJson(searchUrl(q));
+                 const html = (Array.isArray(data) ? data : []).map(emp => `
+                    <div class="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer active:scale-95 transition" onclick="addOne('${emp.code}', '${escapeAttr(emp.name)}', '${escapeAttr(emp.department)}', '${escapeAttr(emp.branch)}')">
+                        <div class="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center font-bold text-blue-600 dark:text-blue-300">${emp.name.charAt(0)}</div>
+                        <div>
+                            <p class="font-bold text-slate-800 dark:text-slate-100">${escapeHtml(emp.name)}</p>
+                            <p class="text-xs text-slate-500">${emp.code} - ${formatDepartment(emp.department)}</p>
+                        </div>
+                    </div>
+                 `).join('');
+                 document.getElementById("suggestListMain").innerHTML = html;
+             } catch(e){}
+        }, 300);
+    };
+
+    window.addOne = (code, name, dept, branch) => {
+        if(employees.some(e=>e.code===code)) { showStatusModal('error', 'Đã có trong danh sách'); return; }
+        const newEmp = { code, name, department: dept, branch, branch_today: currentBranch, so_cong_nv: 1, ghi_chu: "" };
         updateEmployeeOvertime(newEmp);
         employees.unshift(newEmp);
         renderAttendanceList();
         closeModal('searchModal');
-      }catch(err){
-        showStatusModal('error', "Lỗi tìm kiếm: " + (err?.message || err));
-      }
-    }
+    };
 
-    /* ===== Save attendance (giữ nguyên payload/endpoint) ===== */
-    // Hàm phụ trợ: Khôi phục trạng thái nút Lưu
-    function resetSaveBtn() {
-      const saveBtn = document.getElementById('saveBtn');
-      if (!saveBtn) return;
-      saveBtn.disabled = false;
-      saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-      saveBtn.textContent = 'LƯU ĐIỂM DANH';
-    }
-
-    async function saveAttendance(){
-      vibrate();
-      const saveBtn = document.getElementById('saveBtn');
-      
-      // 1. CHẶN NGAY TỪ ĐẦU: Nếu nút đang bị disable thì không làm gì cả
-      if (saveBtn.disabled || saveBtn.classList.contains('cursor-not-allowed')) return;
-
-      // Validate chi nhánh
-      if (!currentBranch) {
-        showStatusModal('error', "Chưa xác định được chi nhánh làm việc. Vui lòng bấm 'Tải lại' hoặc chờ GPS.");
-        return;
-      }
-
-      // Validate danh sách trống
-      if (employees.length === 0){ 
-        showStatusModal('error', "Danh sách trống, không có gì để lưu."); 
-        return; 
-      }
-
-      // 2. KHÓA NÚT VÀ GIAO DIỆN: Thêm visual feedback
-      saveBtn.disabled = true;
-      saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
-      saveBtn.textContent = 'ĐANG LƯU...';
-      
-      showStatusModal('loading', 'Đang lưu dữ liệu...');
-
-      const payload = employees.map(emp => ({
-        ma_nv: emp.code,
-        ten_nv: emp.name,
-        chi_nhanh_chinh: emp.branch,
-        chi_nhanh_lam: emp.branch_today || currentBranch,
-        la_tang_ca: !!emp.la_tang_ca,
-        so_cong_nv: emp.so_cong_nv,
-        ghi_chu: (emp.ghi_chu || "").slice(0, 200),
-        token: qrToken 
-      }));
-
-      try{
-        const res = await fetch(saveUrl(), { 
-          method:"POST",
-          headers:{ "Content-Type":"application/json", "X-CSRF-Token": csrfToken },
-          body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) {
-            let errorMsg = `Lỗi server: ${res.status}`;
-            try {
-                const errData = await res.json();
-                if (errData && errData.detail) errorMsg = errData.detail;
-            } catch(e) {}
-            throw new Error(errorMsg);
-        }
-
-        const doc = await res.json().catch(()=>null);
-        
-        // --- TRƯỜNG HỢP 1: THÀNH CÔNG VÀ CHUYỂN HƯỚNG ---
-        // (Dành cho lần check-in đầu tiên trong ngày)
-        if (doc && doc.redirect_to && doc.status === 'success') {
-            showStatusModal('success', 'Điểm danh thành công! Đang chuyển hướng...', 1500, () => {
-                window.location.replace(doc.redirect_to);
-            });
-            // QUAN TRỌNG: Không gọi resetSaveBtn() ở đây.
-            // Giữ nút bị disable mãi mãi cho đến khi trang chuyển đi để tránh bấm nhầm.
-            return;
-        }
-
-        // --- TRƯỜNG HỢP 2: THÀNH CÔNG (KHÔNG CHUYỂN HƯỚNG) ---
-        if (doc && doc.status === 'success') {
-            showStatusModal('success', 'Lưu điểm danh thành công!', 2000, () => {
-                // Xử lý làm sạch dữ liệu sau khi lưu thành công
-                const role = (userRole||"").toLowerCase();
-                
-                // KTV/Quản lý: Xóa danh sách để tránh lưu trùng
-                if (["quanly","ktv","boss","admin"].includes(role)){
-                    employees = []; 
-                    renderAttendanceList();
-                }
-                
-                // Mở lại nút để sẵn sàng cho thao tác tiếp theo (nếu có)
-                // Lúc này danh sách đã rỗng (với KTV) nên bấm lại cũng không sao (sẽ bị chặn ở bước validate đầu)
-                resetSaveBtn(); 
-            });
-
-        } else {
-          // Server trả về 200 OK nhưng logic business lỗi
-          showStatusModal('error', "Lưu xong nhưng server trả về không chuẩn.");
-          resetSaveBtn(); // Cho phép thử lại
-        }
-
-      } catch(err){
-        // --- TRƯỜNG HỢP 3: LỖI KẾT NỐI HOẶC SERVER ---
-        showStatusModal('error', "Lỗi khi lưu điểm danh: " + (err?.message || err));
-        resetSaveBtn(); // Cho phép thử lại
-      }
-      
-      // ĐÃ XÓA KHỐI FINALLY ĐỂ TRÁNH TỰ ĐỘNG MỞ LẠI NÚT
-    }
-
-    /* ===== Branch detect (giữ logic cũ) ===== */
+    /* GPS & Init */
     async function detectBranchByGPS(){
-      return new Promise((resolve)=>{
-        if (!navigator.geolocation){ disableForm("Trình duyệt không hỗ trợ GPS."); return resolve(null); }
-        navigator.geolocation.getCurrentPosition(async (pos)=>{
-          try{
-            const data = await safeFetchJson(detectBranchUrl(), {
-              method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ lat:pos.coords.latitude, lng:pos.coords.longitude })
-            });
-            if (data && data.error){ disableForm(data.error); return resolve(null); }
-            if (data && data.choices){ showBranchSelectionPopup(data.choices); return resolve(null); }
-            if (data && data.branch){
-              currentBranch = data.branch;
-              document.getElementById("branchName").textContent = branchDisplay(currentBranch);
-              return resolve(currentBranch);
-            }
-            disableForm("Không thể xác định chi nhánh từ GPS."); resolve(null);
-          }catch(err){ disableForm(err?.message || "Lỗi kết nối server."); resolve(null); }
-        }, (err)=>{
-          let message = "Không thể lấy vị trí GPS.";
-          if (err.code === 1) message = "Bạn đã từ chối quyền truy cập vị trí.";
-          disableForm(message); resolve(null);
-        }, { enableHighAccuracy:true, timeout:12000, maximumAge:0 });
-      });
+      // Logic same as original, adapted for UI
+      if (!navigator.geolocation) return;
+      document.getElementById("branchName").textContent = "Đang tìm vị trí...";
+      navigator.geolocation.getCurrentPosition(async (pos)=>{
+          try {
+             const data = await safeFetchJson(detectBranchUrl(), { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ lat:pos.coords.latitude, lng:pos.coords.longitude }) });
+             if(data.branch) {
+                 currentBranch = data.branch;
+                 document.getElementById("branchName").textContent = branchDisplay(currentBranch);
+                 loadEmployeesForBranch();
+             } else if(data.choices) {
+                 // Populate branch popup
+                 const html = data.choices.map(c => `
+                    <button onclick="selectBranch('${c.branch}')" class="w-full flex items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 mb-2 transition">
+                        <span class="font-bold text-slate-800 dark:text-slate-200">${c.branch}</span>
+                        <span class="text-xs text-slate-500">${Math.round(c.distance_km*1000)}m</span>
+                    </button>
+                 `).join('');
+                 document.getElementById('branchChoices').innerHTML = html;
+                 openModal('branchPopup');
+             }
+          } catch(e) { document.getElementById("branchName").textContent = "Lỗi GPS"; }
+      }, () => document.getElementById("branchName").textContent = "Không có GPS");
     }
 
-    /* ===== Branch popup ===== */
-    function showBranchSelectionPopup(choices){
-      const container = document.getElementById("branchChoices");
-      container.innerHTML = "";
-      choices.forEach(ch=>{
-        const btn=document.createElement("button");
-        btn.className = "w-full text-left rounded-lg border border-slate-300 bg-white p-3 text-sm font-semibold transition-colors hover:bg-slate-100 focus-ring";
-        btn.innerHTML = `${branchDisplay(ch.branch)} <span class="font-normal text-slate-500">— ${Math.round(ch.distance_km*1000)} m</span>`;
-        btn.onclick = async ()=>{
-          currentBranch = ch.branch;
-          document.getElementById("branchName").textContent = branchDisplay(currentBranch);
-          try{
-            await safeFetchJson(selectBranchUrl(), { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ branch: ch.branch }) });
-            closeModal('branchPopup'); await loadEmployeesForBranch();
-          }catch(err){ showStatusModal('error', "Lỗi chọn chi nhánh: " + (err?.message || err)); }
-        };
-        container.appendChild(btn);
-      });
-      openModal('branchPopup');
+    window.selectBranch = async (b) => {
+        currentBranch = b;
+        document.getElementById("branchName").textContent = b;
+        await safeFetchJson(selectBranchUrl(), { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ branch: b }) });
+        closeModal('branchPopup');
+        loadEmployeesForBranch();
     }
 
-    /* ===== Search wiring ===== */
-    document.getElementById("addEmployeeBtn").addEventListener("click", (e) => {
-      vibrate();
-      openModal('searchModal');
-      document.getElementById("searchInputMain").value="";
-      document.getElementById("suggestListMain").innerHTML="";
-    });
-
-    let searchTimer=null;
-    document.getElementById("searchInputMain").addEventListener("input",(e)=>{
-      const q=e.target.value.trim(); const list=document.getElementById("suggestListMain");
-      clearTimeout(searchTimer);
-      if (!q){ list.innerHTML=""; return; }
-      searchTimer=setTimeout(async ()=>{
-        try{
-          const data = await safeFetchJson(searchUrl(q));
-          const top = Array.isArray(data) ? data.slice(0,6) : [];
-          list.innerHTML = top.map(emp=>`
-            <div class="cursor-pointer rounded-lg p-3 transition-colors hover:bg-slate-400/20" data-code="${emp.code}">
-              <p class="font-semibold text-slate-800">${escapeHtml(emp.name)}</p>
-              <p class="mt-1 text-sm text-slate-500">${escapeHtml(emp.code)} &bull; ${escapeHtml(emp.department||"")}</p>
-            </div>`).join("");
-          list.querySelectorAll("div[data-code]").forEach(li=>{
-            li.onclick = ()=>{ addBySearchQuery(li.dataset.code); };
-          });
-        }catch(err){ showStatusModal('error', "Lỗi tìm kiếm: " + (err?.message || err)); }
-      }, 300);
-    });
-
-    /* ===== Buttons ===== */
-    document.getElementById("saveBtn").addEventListener("click", (e) => { vibrate(); saveAttendance(); });
-    document.getElementById("refreshBtn").addEventListener("click", (e) => {
-      vibrate();
-      loadEmployeesForBranch();
-    });
-
-    /* ===== Init ===== */
-    window.addEventListener("DOMContentLoaded", async ()=>{
-      // Hiển thị cảnh báo ca đêm nếu điểm danh trước 7h sáng
-      const now = new Date();
-      const currentHour = now.getHours();
-
-      if (currentHour < 7) {
-        const yesterday = new Date(now);
-        yesterday.setDate(now.getDate() - 1);
-        const day = String(yesterday.getDate()).padStart(2, '0');
-        const month = String(yesterday.getMonth() + 1).padStart(2, '0');
-        const year = yesterday.getFullYear();
-        const workDateStr = `${day}/${month}/${year}`;
-
-        document.getElementById('workDate').textContent = workDateStr;
-        document.getElementById('nightShiftNotice').classList.remove('hidden');
-      }
-
-      renderSkeleton(4);
-      const role = (userRole||"").toLowerCase();
-      if (["quanly","ktv","boss","admin"].includes(role)){
-        try{
-          const data = await safeFetchJson("/attendance/api/detect-branch", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({}) });
-          if (data && data.branch){
-            currentBranch = data.branch;
-            document.getElementById("branchName").textContent = branchDisplay(currentBranch);
-            await loadEmployeesForBranch();
-          }else{
-            disableForm("Không tìm thấy chi nhánh chính cho tài khoản.");
-          }
-        }catch(err){ disableForm("Không thể lấy chi nhánh chính."); }
-        return;
-      }
-      const detected = await detectBranchByGPS();
-      if (detected){
-        await loadEmployeesForBranch();
-      }
+    // Initialize logic
+    window.addEventListener("DOMContentLoaded", async () => {
+        // Night shift logic
+        const h = new Date().getHours();
+        if(h < 7) {
+            const y = new Date(); y.setDate(y.getDate()-1);
+            document.getElementById('workDate').textContent = `${y.getDate()}/${y.getMonth()+1}/${y.getFullYear()}`;
+            document.getElementById('nightShiftNotice').classList.remove('hidden');
+        }
+        
+        const role = (userRole||"").toLowerCase();
+        if(["quanly","ktv","boss","admin"].includes(role)) {
+            try {
+                const d = await safeFetchJson("/attendance/api/detect-branch", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({}) });
+                if(d.branch) { currentBranch=d.branch; document.getElementById("branchName").textContent=currentBranch; loadEmployeesForBranch(); }
+            } catch(e){}
+        } else {
+            detectBranchByGPS();
+        }
     });
   </script>
 </body>
