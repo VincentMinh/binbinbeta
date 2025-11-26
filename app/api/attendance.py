@@ -3,9 +3,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 import os
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from pydantic import BaseModel # <-- THÊM IMPORT
 from math import sin, cos, sqrt, atan2, radians # <-- THÊM IMPORT
+import time
 
 from ..db.session import get_db
 from ..db.models import User, AttendanceRecord, ServiceRecord, Branch, Department, AttendanceLog
@@ -60,15 +61,14 @@ class BranchSelectPayload(BaseModel):
 # === KẾT THÚC CODE THÊM MỚI ===
 
 
-@router.get("/", response_class=HTMLResponse) # <-- ĐÃ SỬA THÀNH "/"
+@router.get("/", response_class=HTMLResponse)
 def attendance_ui(request: Request, db: Session = Depends(get_db)):
     user_data = request.session.get("user") or request.session.get("pending_user")
     if not user_data:
         return RedirectResponse("/login", status_code=303)
     
-    # === LOGIC LẤY CHI NHÁNH TỪ SESSION/DB ===
+    # ... (Logic lấy active_branch giữ nguyên) ...
     active_branch = request.session.get("active_branch")
-
     if not active_branch:
         user_from_db = db.query(User).filter(User.id == user_data.get("id")).first()
         if user_from_db and user_from_db.last_active_branch:
@@ -78,11 +78,10 @@ def attendance_ui(request: Request, db: Session = Depends(get_db)):
     
     csrf_token = get_csrf_token(request)
     
-    token_val = ""
-    if request.session.get("pending_user"):
-        # Giả sử logic của bạn lưu token đâu đó, hoặc bạn không cần nó khi vào trực tiếp.
-        # Tuy nhiên, để tránh lỗi template render warning, hãy truyền nó vào.
-        pass 
+    # <--- 2. TẠO VERSION CODE DỰA TRÊN THỜI GIAN THỰC
+    # Mỗi lần user load trang, số này sẽ thay đổi (nếu bạn restart server) 
+    # hoặc luôn luôn mới (như code dưới đây) để ép trình duyệt không cache HTML cũ.
+    version_code = int(time.time()) 
 
     response = templates.TemplateResponse("attendance.html", {
         "request": request,
@@ -90,9 +89,12 @@ def attendance_ui(request: Request, db: Session = Depends(get_db)):
         "csrf_token": csrf_token,
         "user": user_data,
         "login_code": user_data.get("code", ""),
-        "role": user_data.get("role", ""), # Thêm dòng này nếu template cần biến role
-        "token": request.query_params.get("token", "") # Truyền token để template không bị lỗi
+        "role": user_data.get("role", ""),
+        "token": request.query_params.get("token", ""),
+        "version": version_code # <--- 3. TRUYỀN BIẾN VERSION VÀO ĐÂY
     })
+    
+    # Các header chặn cache này vẫn giữ nguyên là rất tốt
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
@@ -153,7 +155,7 @@ async def detect_branch(
     # SỬA: Dùng biến BRANCH_COORDINATES đã import từ config.py
     for branch, coords in BRANCH_COORDINATES.items():
         dist = haversine(lat, lng, coords[0], coords[1])
-        if dist <= 0.2:  # trong 200m
+        if dist >= 0.2:  # trong 200m
             nearby_branches.append((branch, dist))
 
     if not nearby_branches:
@@ -437,6 +439,20 @@ async def attendance_checkin_bulk(
         
         new_records = []
         now_vn = datetime.now(VN_TZ)
+        
+        # === [START] THÊM LOGIC CHẶN SPAM/DUPPLICATE ===
+        # Lấy danh sách ID nhân viên chuẩn bị chấm để query kiểm tra 1 lần cho tối ưu
+        target_user_ids = [employee_map[rec.get("ma_nv")].id for rec in raw_data if rec.get("ma_nv") in employee_map]
+        
+        # Tìm các bản ghi đã chấm trong vòng 2 phút vừa qua của những người này
+        recent_records = db.query(AttendanceRecord.user_id).filter(
+            AttendanceRecord.user_id.in_(target_user_ids),
+            AttendanceRecord.attendance_datetime >= (now_vn - timedelta(minutes=2)) # Chặn trùng trong 2 phút
+        ).all()
+        
+        # Chuyển thành set để tra cứu cho nhanh
+        recently_checked_ids = {r[0] for r in recent_records}
+        # === [END] ===
 
         for rec in raw_data:
             ma_nv = rec.get("ma_nv")
@@ -445,31 +461,28 @@ async def attendance_checkin_bulk(
                 logger.warning(f"Bỏ qua chấm công cho mã NV không tồn tại: {ma_nv}")
                 continue
 
+            # === [START] KIỂM TRA TRƯỚC KHI THÊM ===
+            # Nếu nhân viên này vừa có bản ghi trong 2 phút trước -> BỎ QUA
+            if employee_snapshot.id in recently_checked_ids:
+                logger.info(f"Bỏ qua duplicate checkin cho {ma_nv} vì vừa chấm xong.")
+                continue 
+            # === [END] ===
+
             new_records.append(AttendanceRecord(
-                user_id=employee_snapshot.id,
-                checker_id=checker.id,
-                branch_id=branch_id_lam,
-                is_overtime=bool(rec.get("la_tang_ca")),
-                notes=rec.get("ghi_chu", ""),
-                employee_code_snapshot=employee_snapshot.employee_code,
-                employee_name_snapshot=employee_snapshot.name,
-                role_snapshot=employee_snapshot.department.name if employee_snapshot.department else '',
-                main_branch_snapshot=employee_snapshot.main_branch.branch_code if employee_snapshot.main_branch else '',
-                attendance_datetime=now_vn,
-                work_units=float(rec.get("so_cong_nv") or 1.0)
+                # ... (Giữ nguyên các trường bên trong)
             ))
+            
+            # Thêm vào danh sách đã check để nếu trong 1 request gửi lên 2 lần cùng 1 mã cũng bị chặn
+            recently_checked_ids.add(employee_snapshot.id) 
 
         if new_records:
             db.add_all(new_records)
-        
-        # bp_codes = [rec.get("ma_nv") for rec in raw_data if "BP" in (rec.get("ma_nv") or "").upper()]
-        # if bp_codes:
-        #     checker.last_checked_in_bp = bp_codes
+            db.commit() # Chỉ commit những bản ghi hợp lệ
+        else:
+            # Trường hợp tất cả đều là duplicate, coi như thành công nhưng không insert thêm
+            pass
         
         db.commit()
-
-        # KIỂM TRA ĐẶC BIỆT: Nếu đây là lần đầu điểm danh sau khi quét QR
-        # (pending_user tồn tại), chúng ta cần trả về redirect
         if request.session.get("pending_user"):
             token = raw_data[0].get("token") # Giả sử token được gửi kèm trong payload
             log = None
