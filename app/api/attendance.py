@@ -6,7 +6,6 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 from pydantic import BaseModel # <-- THÊM IMPORT
 from math import sin, cos, sqrt, atan2, radians # <-- THÊM IMPORT
-import time
 
 from ..db.session import get_db
 from ..db.models import User, AttendanceRecord, ServiceRecord, Branch, Department, AttendanceLog
@@ -77,11 +76,6 @@ def attendance_ui(request: Request, db: Session = Depends(get_db)):
             active_branch = user_data.get("branch", "")
     
     csrf_token = get_csrf_token(request)
-    
-    # <--- 2. TẠO VERSION CODE DỰA TRÊN THỜI GIAN THỰC
-    # Mỗi lần user load trang, số này sẽ thay đổi (nếu bạn restart server) 
-    # hoặc luôn luôn mới (như code dưới đây) để ép trình duyệt không cache HTML cũ.
-    version_code = int(time.time()) 
 
     response = templates.TemplateResponse("attendance.html", {
         "request": request,
