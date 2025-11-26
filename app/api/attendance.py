@@ -155,7 +155,7 @@ async def detect_branch(
     # SỬA: Dùng biến BRANCH_COORDINATES đã import từ config.py
     for branch, coords in BRANCH_COORDINATES.items():
         dist = haversine(lat, lng, coords[0], coords[1])
-        if dist >= 0.2:  # trong 200m
+        if dist <= 0.2:  # trong 200m
             nearby_branches.append((branch, dist))
 
     if not nearby_branches:
@@ -469,7 +469,22 @@ async def attendance_checkin_bulk(
             # === [END] ===
 
             new_records.append(AttendanceRecord(
-                # ... (Giữ nguyên các trường bên trong)
+                user_id=employee_snapshot.id,   # <--- Đây là cái fix lỗi NotNullViolation
+                checker_id=checker.id,          # ID người thực hiện chấm
+                branch_id=branch_id_lam,        # ID chi nhánh làm việc
+                
+                # Snapshot dữ liệu nhân viên tại thời điểm chấm (đề phòng nhân viên đổi tên/phòng ban sau này)
+                employee_code_snapshot=employee_snapshot.employee_code,
+                employee_name_snapshot=employee_snapshot.name,
+                role_snapshot=employee_snapshot.department.role_code if employee_snapshot.department else None,
+                main_branch_snapshot=employee_snapshot.main_branch.branch_code if employee_snapshot.main_branch else None,
+                
+                attendance_datetime=now_vn,
+                
+                # Dữ liệu từ Frontend gửi lên
+                work_units=float(rec.get("so_cong_nv", 1.0)),
+                is_overtime=bool(rec.get("la_tang_ca", False)),
+                notes=rec.get("ghi_chu", "")
             ))
             
             # Thêm vào danh sách đã check để nếu trong 1 request gửi lên 2 lần cùng 1 mã cũng bị chặn
