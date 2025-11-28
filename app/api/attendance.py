@@ -208,7 +208,8 @@ async def select_branch(
 
 # --- CÁC API CÒN LẠI GIỮ NGUYÊN ---
 
-# === HÀM NÀY ĐÃ ĐƯỢC SỬA LẠI LOGIC ĐỂ KHẮC PHỤC LỖI CỦA BẠN ===
+#
+
 @router.get("/api/employees/by-branch/{branch_code}", response_class=JSONResponse)
 def get_employees_by_branch(branch_code: str, db: Session = Depends(get_db), request: Request = None):
     try:
@@ -223,7 +224,7 @@ def get_employees_by_branch(branch_code: str, db: Session = Depends(get_db), req
         _, shift_name = get_current_work_shift()
         current_shift_code = "CS" if shift_name == "day" else "CT"
         
-        # Bắt đầu query
+        # Bắt đầu query cơ bản
         query = db.query(User).options(
             joinedload(User.department),
             joinedload(User.main_branch)
@@ -231,16 +232,15 @@ def get_employees_by_branch(branch_code: str, db: Session = Depends(get_db), req
 
         user_role = session_user.get("role")
 
+        # ================= LOGIC PHÂN QUYỀN HIỂN THỊ =================
+
+        # 1. LỄ TÂN: Giữ nguyên logic cũ
         if user_role == "letan":
             letan_dept_id = db.query(Department.id).filter(Department.role_code == 'letan').scalar()
             buongphong_dept_id = db.query(Department.id).filter(Department.role_code == 'buongphong').scalar()
             baove_dept_id = db.query(Department.id).filter(Department.role_code == 'baove').scalar()
 
-            # === ĐÂY LÀ LOGIC SỬA LỖI ===
-            # Lọc để bao gồm:
-            # 1. Chính người lễ tân đang đăng nhập (bất kể chi nhánh chính của họ).
-            # 2. Hoặc, (là Buồng phòng HOẶC Bảo vệ) VÀ (cùng ca) VÀ (cùng chi nhánh làm việc).
-            
+            # Thấy chính mình HOẶC (BP/BV cùng chi nhánh + cùng ca)
             filter_logic = or_(
                 User.id == session_user["id"],
                 and_(
@@ -250,32 +250,21 @@ def get_employees_by_branch(branch_code: str, db: Session = Depends(get_db), req
                 )
             )
             query = query.filter(filter_logic)
-            
-        elif user_role in ["admin", "boss", "quanly"]:
-            # Admin/Boss/Quản lý thấy tất cả mọi người ở chi nhánh đó
+
+        # 2. QUẢN LÝ & KTV: Chỉ hiển thị CHÍNH HỌ (Logic mới bạn yêu cầu)
+        elif user_role in ["quanly", "ktv"]:
+            # Chỉ lọc ra đúng user đang đăng nhập
+            query = query.filter(User.id == session_user["id"])
+
+        # 3. ADMIN & BOSS: Thấy TOÀN BỘ nhân viên thuộc chi nhánh đó
+        elif user_role in ["admin", "boss"]:
             query = query.filter(User.main_branch_id == branch.id)
         
-        else: # Các vai trò khác (KTV, v.v.)
-            # Chỉ thấy chính họ (nếu họ ở chi nhánh đó) và BP/BV cùng ca
-            
-            buongphong_dept_id = db.query(Department.id).filter(Department.role_code == 'buongphong').scalar()
-            baove_dept_id = db.query(Department.id).filter(Department.role_code == 'baove').scalar()
+        # 4. Các vai trò khác (nếu có): Mặc định chỉ thấy chính mình cho an toàn
+        else:
+            query = query.filter(User.id == session_user["id"])
 
-            # Lọc để bao gồm:
-            # 1. Chính user đó, VỚI ĐIỀU KIỆN user đó thuộc chi nhánh này.
-            # 2. Hoặc, (là Buồng phòng HOẶC Bảo vệ) VÀ (cùng ca) VÀ (cùng chi nhánh làm việc).
-            filter_logic = or_(
-                and_(
-                    User.id == session_user["id"],
-                    User.main_branch_id == branch.id
-                ),
-                and_(
-                    User.main_branch_id == branch.id,
-                    User.shift == current_shift_code,
-                    User.department_id.in_([buongphong_dept_id, baove_dept_id])
-                )
-            )
-            query = query.filter(filter_logic)
+        # =============================================================
 
         employees = query.order_by(User.name).all()
 
@@ -399,6 +388,7 @@ def search_employees(
 
 
 # ... (API /checkin_bulk giữ nguyên như file của bạn) ...
+#
 @router.post("/checkin_bulk")
 async def attendance_checkin_bulk(
     request: Request,
@@ -408,6 +398,7 @@ async def attendance_checkin_bulk(
     session_user = request.session.get("user") or request.session.get("pending_user")
     if not session_user:
         raise HTTPException(status_code=403, detail="Không có quyền điểm danh.")
+    
     checker = db.query(User).filter(User.employee_code == session_user["code"]).first()
     if not checker:
         raise HTTPException(status_code=403, detail="Không tìm thấy người dùng thực hiện điểm danh.")
@@ -417,12 +408,16 @@ async def attendance_checkin_bulk(
         if not isinstance(raw_data, list) or not raw_data:
             return {"status": "success", "inserted": 0}
 
+        # --- XỬ LÝ CHI NHÁNH ---
         branch_code_from_payload = raw_data[0].get("chi_nhanh_lam")
         branch_obj = db.query(Branch).filter(Branch.branch_code == branch_code_from_payload).first()
         if not branch_obj:
-            raise HTTPException(status_code=400, detail=f"Chi nhánh làm việc không hợp lệ: {branch_code_from_payload}")
-        branch_id_lam = branch_obj.id
+             # Fallback: Nếu lỗi chi nhánh, lấy chi nhánh chính của người chấm
+             branch_id_lam = checker.main_branch_id 
+        else:
+             branch_id_lam = branch_obj.id
         
+        # --- CHUẨN BỊ DỮ LIỆU ---
         employee_codes = {rec.get("ma_nv") for rec in raw_data if rec.get("ma_nv")}
         employees_in_db = db.query(User).options(
             joinedload(User.main_branch), 
@@ -433,78 +428,98 @@ async def attendance_checkin_bulk(
         new_records = []
         now_vn = datetime.now(VN_TZ)
         
-        # === [START] THÊM LOGIC CHẶN SPAM/DUPPLICATE ===
-        # Lấy danh sách ID nhân viên chuẩn bị chấm để query kiểm tra 1 lần cho tối ưu
+        # --- LỌC TRÙNG LẶP (DUPLICATE) ---
         target_user_ids = [employee_map[rec.get("ma_nv")].id for rec in raw_data if rec.get("ma_nv") in employee_map]
-        
-        # Tìm các bản ghi đã chấm trong vòng 2 phút vừa qua của những người này
         recent_records = db.query(AttendanceRecord.user_id).filter(
             AttendanceRecord.user_id.in_(target_user_ids),
-            AttendanceRecord.attendance_datetime >= (now_vn - timedelta(minutes=2)) # Chặn trùng trong 2 phút
+            AttendanceRecord.attendance_datetime >= (now_vn - timedelta(minutes=2))
         ).all()
-        
-        # Chuyển thành set để tra cứu cho nhanh
         recently_checked_ids = {r[0] for r in recent_records}
-        # === [END] ===
+
+        # Danh sách ID những người thực sự được insert đợt này
+        inserted_user_ids = set()
 
         for rec in raw_data:
             ma_nv = rec.get("ma_nv")
             employee_snapshot = employee_map.get(ma_nv)
-            if not employee_snapshot:
-                logger.warning(f"Bỏ qua chấm công cho mã NV không tồn tại: {ma_nv}")
-                continue
+            if not employee_snapshot: continue
 
-            # === [START] KIỂM TRA TRƯỚC KHI THÊM ===
-            # Nếu nhân viên này vừa có bản ghi trong 2 phút trước -> BỎ QUA
-            if employee_snapshot.id in recently_checked_ids:
-                logger.info(f"Bỏ qua duplicate checkin cho {ma_nv} vì vừa chấm xong.")
-                continue 
-            # === [END] ===
+            # Nếu vừa chấm xong -> Bỏ qua
+            if employee_snapshot.id in recently_checked_ids: continue 
 
             new_records.append(AttendanceRecord(
-                user_id=employee_snapshot.id,   # <--- Đây là cái fix lỗi NotNullViolation
-                checker_id=checker.id,          # ID người thực hiện chấm
-                branch_id=branch_id_lam,        # ID chi nhánh làm việc
-                
-                # Snapshot dữ liệu nhân viên tại thời điểm chấm (đề phòng nhân viên đổi tên/phòng ban sau này)
+                user_id=employee_snapshot.id,
+                checker_id=checker.id,
+                branch_id=branch_id_lam,
                 employee_code_snapshot=employee_snapshot.employee_code,
                 employee_name_snapshot=employee_snapshot.name,
                 role_snapshot=employee_snapshot.department.role_code if employee_snapshot.department else None,
                 main_branch_snapshot=employee_snapshot.main_branch.branch_code if employee_snapshot.main_branch else None,
-                
                 attendance_datetime=now_vn,
-                
-                # Dữ liệu từ Frontend gửi lên
                 work_units=float(rec.get("so_cong_nv", 1.0)),
                 is_overtime=bool(rec.get("la_tang_ca", False)),
                 notes=rec.get("ghi_chu", "")
             ))
-            
-            # Thêm vào danh sách đã check để nếu trong 1 request gửi lên 2 lần cùng 1 mã cũng bị chặn
-            recently_checked_ids.add(employee_snapshot.id) 
+            recently_checked_ids.add(employee_snapshot.id)
+            inserted_user_ids.add(employee_snapshot.id)
+
+        # === [FIX QUAN TRỌNG] TỰ ĐỘNG THÊM VÉ CHO CHECKER (QL01/KTV) NẾU THIẾU ===
+        # Nếu đang ở chế độ chờ (pending) VÀ bản thân Checker chưa có trong danh sách vừa tạo
+        is_pending = request.session.get("pending_user")
+        if is_pending and (checker.id not in inserted_user_ids) and (checker.id not in recently_checked_ids):
+             self_record = AttendanceRecord(
+                user_id=checker.id,
+                checker_id=checker.id,
+                branch_id=branch_id_lam,
+                employee_code_snapshot=checker.employee_code,
+                employee_name_snapshot=checker.name,
+                role_snapshot=checker.department.role_code if checker.department else None,
+                main_branch_snapshot=checker.main_branch.branch_code if checker.main_branch else None,
+                attendance_datetime=now_vn,
+                work_units=1.0,
+                is_overtime=False,
+                notes="Tự động điểm danh (Checker)"
+            )
+             new_records.append(self_record)
+             inserted_user_ids.add(checker.id) # Đánh dấu đã có vé
 
         if new_records:
             db.add_all(new_records)
-            db.commit() # Chỉ commit những bản ghi hợp lệ
-        else:
-            # Trường hợp tất cả đều là duplicate, coi như thành công nhưng không insert thêm
-            pass
+            db.commit()
         
-        db.commit()
+        # === [XỬ LÝ TRẠNG THÁI ĐĂNG NHẬP] ===
         if request.session.get("pending_user"):
-            token = raw_data[0].get("token") # Giả sử token được gửi kèm trong payload
+            token = raw_data[0].get("token")
             log = None
+            
+            # 1. Tìm Log bằng Token (nếu quét QR)
             if token:
                  log = db.query(AttendanceLog).filter(AttendanceLog.token == token).first()
+            
+            # 2. [FIX CHÍNH] Tìm Log bằng User ID + Ngày (nếu đăng nhập Pass/Token null)
+            # Đây là lý do QL01 bị lỗi ở code cũ: Token null -> không tìm thấy log -> DB vẫn False
+            if not log:
+                work_date, _ = get_current_work_shift()
+                log = db.query(AttendanceLog).filter(
+                    AttendanceLog.user_id == checker.id,
+                    AttendanceLog.work_date == work_date
+                ).first()
 
+            # Cập nhật trạng thái check-in trong DB
             if log and not log.checked_in:
                 log.checked_in = True
-                db.commit()
+                db.commit() # Lưu vào DB để lần sau đăng nhập lại hệ thống biết là "Đã check-in"
             
+            # Chuyển Session từ Pending -> User chính thức
             request.session["user"] = session_user
             request.session["after_checkin"] = "choose_function"
             request.session.pop("pending_user", None)
-            return {"status": "success", "inserted": len(new_records), "redirect_to": str(request.url_for('choose_function'))}
+            
+            return {
+                "status": "success", 
+                "inserted": len(new_records), 
+                "redirect_to": str(request.url_for('choose_function'))
+            }
 
         return {"status": "success", "inserted": len(new_records)}
 
