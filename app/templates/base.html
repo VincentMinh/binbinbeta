@@ -184,8 +184,53 @@
                 </a>
             </nav>
 
-            <div class="p-2 mt-auto border-t dark:border-slate-800">
+            <div class="p-4 mt-auto border-t dark:border-slate-800" x-show="!sidebarCollapsed">
+                {% set current_branch = request.session.get('active_branch') %}
+                
+                <div class="flex flex-col gap-1">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Chi nhánh hiện tại
+                    </span>
+                    
+                    <div class="flex items-center gap-2 mt-1">
+                        <div id="sb-branch-icon-box"
+                            class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-300
+                            {{ 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' if current_branch else 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                            <path fill-rule="evenodd" d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 00-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 002.682 2.282 16.975 16.975 0 001.145.742zM12 13.5a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+
+                        <div class="flex flex-col overflow-hidden">
+                            <span id="sb-branch-name" class="font-bold text-sm text-slate-700 dark:text-slate-200 truncate" title="{{ current_branch }}">
+                                {{ current_branch if current_branch else 'Chưa chọn' }}
+                            </span>
+                            
+                            <span id="sb-branch-status" class="text-[10px] text-green-600 dark:text-green-400 flex items-center gap-1 {{ '' if current_branch else 'hidden' }}">
+                                <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                Đang hoạt động
+                            </span>
+                            
+                            <a id="sb-branch-action" href="/attendance" class="text-[10px] text-blue-500 hover:underline {{ 'hidden' if current_branch else '' }}">
+                                Chọn ngay &rarr;
+                            </a>
+                        </div>
+                    </div>
                 </div>
+            </div>
+
+            <div class="p-2 mt-auto border-t dark:border-slate-800 flex justify-center" x-show="sidebarCollapsed">
+                <div id="sb-branch-collapsed-icon"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center cursor-help group relative transition-colors duration-300
+                    {{ 'bg-green-100 text-green-600' if current_branch else 'bg-slate-100 text-slate-500' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                        <path fill-rule="evenodd" d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 00-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 002.682 2.282 16.975 16.975 0 001.145.742zM12 13.5a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                    </svg>
+                    <div id="sb-branch-tooltip" class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 transition-opacity">
+                        {{ current_branch if current_branch else 'Chưa chọn CN' }}
+                    </div>
+                </div>
+            </div>
         </aside>
 
         <div x-show="sidebarOpen" @click="sidebarOpen = false" 
@@ -316,5 +361,63 @@
 
     {% block scripts %}
     {% endblock %}
+    <script>
+    // Hàm cập nhật giao diện Sidebar
+    function updateSidebarBranch(branchName) {
+        const hasBranch = !!branchName;
+
+        // 1. Cập nhật Icon Box (Màu sắc)
+        const iconBox = document.getElementById('sb-branch-icon-box');
+        const collapsedIcon = document.getElementById('sb-branch-collapsed-icon');
+        
+        const activeClasses = ['bg-green-100', 'text-green-600', 'dark:bg-green-900/30', 'dark:text-green-400'];
+        const inactiveClasses = ['bg-slate-100', 'text-slate-500', 'dark:bg-slate-800', 'dark:text-slate-400'];
+
+        if (hasBranch) {
+            iconBox?.classList.remove(...inactiveClasses);
+            iconBox?.classList.add(...activeClasses);
+            collapsedIcon?.classList.remove(...inactiveClasses);
+            // Collapsed icon might not have dark mode classes depending on structure, usually safer to add base ones
+            collapsedIcon?.classList.add('bg-green-100', 'text-green-600');
+        } else {
+            iconBox?.classList.remove(...activeClasses);
+            iconBox?.classList.add(...inactiveClasses);
+            collapsedIcon?.classList.remove('bg-green-100', 'text-green-600');
+            collapsedIcon?.classList.add('bg-slate-100', 'text-slate-500');
+        }
+
+        // 2. Cập nhật Text
+        const nameEl = document.getElementById('sb-branch-name');
+        if (nameEl) {
+            nameEl.textContent = hasBranch ? branchName : 'Chưa chọn';
+            nameEl.title = branchName || '';
+        }
+        
+        // 3. Cập nhật Tooltip (khi thu nhỏ)
+        const tooltipEl = document.getElementById('sb-branch-tooltip');
+        if (tooltipEl) tooltipEl.textContent = hasBranch ? branchName : 'Chưa chọn CN';
+
+        // 4. Toggle trạng thái hiển thị
+        const statusEl = document.getElementById('sb-branch-status');
+        const actionEl = document.getElementById('sb-branch-action');
+
+        if (hasBranch) {
+            statusEl?.classList.remove('hidden');
+            actionEl?.classList.add('hidden');
+        } else {
+            statusEl?.classList.add('hidden');
+            actionEl?.classList.remove('hidden');
+        }
+        
+        console.log("Sidebar updated to branch:", branchName);
+    }
+
+    // --- LẮNG NGHE SỰ KIỆN TOÀN CỤC ---
+    window.addEventListener('branch-changed', function(event) {
+        // Sự kiện này được dispatch từ bất kỳ đâu trong app
+        const newBranch = event.detail; 
+        updateSidebarBranch(newBranch);
+    });
+</script>
 </body>
 </html>
