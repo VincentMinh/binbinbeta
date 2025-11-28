@@ -283,6 +283,11 @@
           <svg class="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
         </div>
       </div>
+
+      <!-- Inline Error Message Container -->
+      <div id="searchError" class="hidden px-4 py-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm font-medium text-center transition-all duration-300">
+        Nhân viên đã có trong danh sách.
+      </div>
       
       <div class="flex-1 overflow-y-auto px-4 py-4">
         <h4 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Gợi ý</h4>
@@ -312,6 +317,37 @@
     const csrfToken = "{{ csrf_token }}";
     let currentBranch = "{{ branch_id }}" || "";
     const qrToken = "{{ token | default('', true) }}";
+
+    /* ========= SOUND MANAGER (NEW) ========= */
+    // 1. Mở khóa AudioContext cho Mobile (Copy từ Lost & Found)
+    (function() {
+      let audioUnlocked = false;
+      const unlockAudio = () => {
+        if (audioUnlocked) return;
+        // Phát một âm thanh rỗng cực ngắn để "mồi" trình duyệt
+        const audio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+        audio.play().then(() => { audioUnlocked = true; }).catch(() => {});
+        ['click', 'touchstart'].forEach(evt => document.body.removeEventListener(evt, unlockAudio));
+      };
+      ['click', 'touchstart'].forEach(evt => document.body.addEventListener(evt, unlockAudio, { once: true }));
+    })();
+
+    // 2. Hàm phát âm thanh tập trung
+    const audioFiles = {
+        success: '/static/sounds/Complete.mp3', // Dùng khi Lưu thành công
+        add:     '/static/sounds/Add.mp3',      // Dùng khi Thêm nhân viên vào list
+        update:  '/static/sounds/Update.mp3',   // Dùng cho nút Refresh / Mở modal
+        delete:  '/static/sounds/Delete.mp3'    // Dùng khi Xóa dòng
+    };
+
+    function playSound(type) {
+        const src = audioFiles[type];
+        if (!src) return;
+        const audio = new Audio(src);
+        audio.volume = 0.6; // Âm lượng vừa phải
+        audio.play().catch(err => console.warn("Audio blocked:", err));
+    }
+
   </script>
 
   <!-- Logic Script -->
@@ -322,11 +358,20 @@
     const htmlEl = document.documentElement;
 
     function initTheme() {
-      const storedTheme = localStorage.getItem('theme');
-      if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        htmlEl.classList.add('dark');
+      const storedTheme = localStorage.getItem('theme'); // Lấy theme đã lưu
+      if (storedTheme) {
+        // Nếu người dùng đã chọn, ưu tiên lựa chọn đó
+        htmlEl.classList.toggle('dark', storedTheme === 'dark');
       } else {
-        htmlEl.classList.remove('dark');
+        // Nếu chưa, tự động xác định theo giờ
+        const currentHour = new Date().getHours();
+        // Chế độ tối từ 19:00 (7 PM) đến 6:59 AM
+        if (currentHour >= 19 || currentHour < 7) {
+          htmlEl.classList.add('dark');
+        } else {
+          // Chế độ sáng từ 7:00 AM đến 18:59 PM
+          htmlEl.classList.remove('dark');
+        }
       }
     }
     
@@ -352,13 +397,17 @@
     function escapeHtml(s){ return String(s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
 
     function formatDepartment(department) {
-      if (department && department.toLowerCase() === 'buongphong') {
-        return 'Buồng phòng';
-      }
-      return department;
+        const roleMap = {
+            "letan": "Lễ tân",
+            "buongphong": "Buồng phòng",
+            "baove": "Bảo vệ",
+            "ktv": "Kỹ thuật viên",
+            "quanly": "Quản lý"
+        };
+        const lowerDept = (department || "").toLowerCase();
+        return roleMap[lowerDept] || department;
     }
     function escapeAttr(s){ return String(s||"").replaceAll('"','&quot;'); }
-    function branchDisplay(branchCode) { return branchCode || "(Chưa rõ)"; }
 
     function updateEmployeeOvertime(emp) {
         const isDifferentBranch = (emp.branch || "") !== (emp.branch_today || currentBranch);
@@ -398,18 +447,20 @@
     const statusModalContent = document.getElementById('statusModalContent');
     let modalHideTimer = null;
 
-    function showStatusModal(state, message = "", autoHideDuration = 0, onHidden = null) {
+    function showStatusModal(state, message = "", autoHideDuration = 0, onHidden = null, title = null) {
       if (modalHideTimer) clearTimeout(modalHideTimer);
       
       const states = ['statusLoading', 'statusSuccess', 'statusError'];
       states.forEach(s => document.getElementById(s).classList.add('hidden'));
 
       if(state === 'loading') {
-          document.getElementById('statusLoading').classList.remove('hidden');
-          document.getElementById('loadingMessage').textContent = message || "Đang xử lý...";
+        document.getElementById('statusLoading').classList.remove('hidden');
+        document.getElementById('loadingMessage').textContent = message || "Đang xử lý...";
       } else if(state === 'success') {
-          document.getElementById('statusSuccess').classList.remove('hidden');
-          document.getElementById('successMessage').textContent = message || "Thành công!";
+        const successEl = document.getElementById('statusSuccess');
+        successEl.classList.remove('hidden');
+        successEl.querySelector('h3').textContent = title || 'Thành công!';
+        successEl.querySelector('p').textContent = message || 'Dữ liệu đã được lưu.';
       } else {
           document.getElementById('statusError').classList.remove('hidden');
           document.getElementById('errorMessage').textContent = message || "Lỗi không xác định";
@@ -546,6 +597,7 @@
         // Event Handlers
         row.querySelector('.btn-delete').onclick = (e) => {
             vibrate(10);
+            playSound('delete');
             employees = employees.filter(x => x.code !== e.currentTarget.dataset.code);
             // Animate out
             const parent = e.currentTarget.closest('div.animate-slide-up');
@@ -604,6 +656,11 @@
       if (saveBtn.disabled) return;
       const saveIcon = document.getElementById('saveIcon');
       const saveSpinner = document.getElementById('saveSpinner');
+
+      // THÊM: Hộp thoại xác nhận trước khi lưu
+      if (!confirm(`Bạn có chắc chắn muốn lưu điểm danh cho ${employees.length} nhân viên không?`)) {
+        return; // Dừng lại nếu người dùng không xác nhận
+      }
       
       if (employees.length === 0){ showStatusModal('error', "Danh sách trống!"); return; }
       if (!currentBranch) { showStatusModal('error', "Chưa xác định chi nhánh!"); return; }
@@ -638,10 +695,11 @@
         const doc = await res.json();
 
         if (doc && doc.status === 'success') {
+            playSound('success');
             if(doc.redirect_to) {
-                showStatusModal('success', 'Chuyển hướng...', 1000, () => window.location.replace(doc.redirect_to));
+                showStatusModal('success', 'Chuyển hướng...', 1000, () => window.location.replace(doc.redirect_to), 'Điểm danh thành công!');
             } else {
-                showStatusModal('success', 'Đã lưu điểm danh!', 2000, () => {
+                showStatusModal('success', 'Dữ liệu đã được cập nhật.', 2000, () => {
                    const role = (userRole||"").toLowerCase();
                    if (["quanly","ktv","boss","admin"].includes(role)) {
                        employees = []; renderAttendanceList();
@@ -649,17 +707,29 @@
                    resetBtn();
                 });
             }
-        } else { throw new Error("API returned failure"); }
+        } else { throw new Error(doc.message || "API returned failure"); }
 
       } catch(err) {
+        playSound('delete')
         showStatusModal('error', "Lỗi lưu: " + err.message);
         resetBtn();
       }
     }
 
     /* Search & Branch Logic (Simplified for brevity but fully functional) */
-    document.getElementById("addEmployeeBtn").onclick = () => { vibrate(); openModal('searchModal'); document.getElementById("searchInputMain").value=""; document.getElementById("suggestListMain").innerHTML=""; };
-    document.getElementById("refreshBtn").onclick = () => { vibrate(); document.getElementById("attendanceList").innerHTML=""; loadEmployeesForBranch(); };
+    document.getElementById("addEmployeeBtn").onclick = () => { 
+        vibrate(); 
+        openModal('searchModal'); 
+        document.getElementById("searchInputMain").value=""; 
+        document.getElementById("suggestListMain").innerHTML=""; 
+    };
+
+    document.getElementById("refreshBtn").onclick = () => { 
+        vibrate(); 
+        playSound('update'); // <--- THÊM: Âm thanh click nhẹ
+        document.getElementById("attendanceList").innerHTML=""; 
+        loadEmployeesForBranch(); 
+    };
     document.getElementById("saveBtn").onclick = saveAttendance;
 
     let searchTimer;
@@ -671,11 +741,16 @@
              try {
                  const data = await safeFetchJson(searchUrl(q));
                  const html = (Array.isArray(data) ? data : []).map(emp => `
-                    <div class="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer active:scale-95 transition" onclick="addOne('${emp.code}', '${escapeAttr(emp.name)}', '${escapeAttr(emp.department)}', '${escapeAttr(emp.branch)}')">
+                    <div class="flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer active:scale-95 transition" onclick="addOne('${emp.code}', '${escapeAttr(emp.name)}', '${escapeAttr(emp.department)}', '${escapeAttr(emp.branch)}')">
+                        <div class="flex items-center gap-3">
                         <div class="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center font-bold text-blue-600 dark:text-blue-300">${emp.name.charAt(0)}</div>
                         <div>
                             <p class="font-bold text-slate-800 dark:text-slate-100">${escapeHtml(emp.name)}</p>
                             <p class="text-xs text-slate-500">${emp.code} - ${formatDepartment(emp.department)}</p>
+                        </div>
+                        </div>
+                        <div class="p-2 text-slate-400">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                         </div>
                     </div>
                  `).join('');
@@ -685,12 +760,28 @@
     };
 
     window.addOne = (code, name, dept, branch) => {
-        if(employees.some(e=>e.code===code)) { showStatusModal('error', 'Đã có trong danh sách'); return; }
+        if(employees.some(e => e.code === code)) {
+            const errorDiv = document.getElementById('searchError');
+            errorDiv.textContent = `Nhân viên "${name}" đã có trong danh sách.`;
+            errorDiv.classList.remove('hidden');
+            // Rung và phát âm thanh lỗi
+            vibrate(20);
+            playSound('delete');
+            // Tự động ẩn sau 3 giây
+            setTimeout(() => {
+                errorDiv.classList.add('hidden');
+            }, 3000);
+            return; 
+        }
+        // Ẩn thông báo lỗi nếu có
+        document.getElementById('searchError').classList.add('hidden');
         const newEmp = { code, name, department: dept, branch, branch_today: currentBranch, so_cong_nv: 1, ghi_chu: "" };
         updateEmployeeOvertime(newEmp);
         employees.unshift(newEmp);
         renderAttendanceList();
-        closeModal('searchModal');
+        closeModal('searchModal'); // Đóng modal sau khi thêm
+        playSound('add');
+        showStatusModal('success', `Đã thêm "${name} - ${formatDepartment(dept)}" vào danh sách.`, 2000);
     };
 
     /* GPS & Init */
@@ -703,7 +794,7 @@
              const data = await safeFetchJson(detectBranchUrl(), { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ lat:pos.coords.latitude, lng:pos.coords.longitude }) });
              if(data.branch) {
                  currentBranch = data.branch;
-                 document.getElementById("branchName").textContent = branchDisplay(currentBranch);
+                 document.getElementById("branchName").textContent = currentBranch || "(Chưa rõ)";
                  loadEmployeesForBranch();
              } else if(data.choices) {
                  // Populate branch popup
