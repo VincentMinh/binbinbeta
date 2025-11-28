@@ -49,6 +49,18 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
+
+    /* Thêm vào trong <style> */
+    .bg-size-200 {
+        background-size: 200% 200%;
+    }
+    .bg-pos-0 {
+        background-position: 0% 0%;
+    }
+    .bg-pos-100 {
+        background-position: 100% 100%;
+    }
+    
     /* Custom Scrollbar hide */
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -83,6 +95,45 @@
 
     /* Remove Input Spinners */
     input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+    /* Thêm vào trong thẻ <style> */
+
+    /* Hiệu ứng trượt sang phải khi xóa */
+    .slide-out-right {
+      animation: slideOutRight 0.4s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+    }
+
+    /* Hiệu ứng thu gọn chiều cao sau khi trượt xong */
+    .collapse-height {
+      transition: max-height 0.3s ease-out, margin-top 0.3s ease-out, padding 0.3s ease-out, opacity 0.3s ease-out;
+      max-height: 0 !important;
+      margin-top: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      opacity: 0 !important;
+      overflow: hidden;
+    }
+
+    @keyframes slideOutRight {
+      0% { transform: translateX(0); opacity: 1; }
+      100% { transform: translateX(100%); opacity: 0; }
+    }
+
+    /* Tinh chỉnh Select box cho gọn - SẠCH SẼ HOÀN TOÀN */
+    .select-minimal {
+      background-image: none; /* Bỏ mũi tên */
+      text-align: center;
+      text-align-last: center;
+      border: none !important;      /* Bỏ viền */
+      outline: none !important;     /* Bỏ focus ring */
+      box-shadow: none !important;  /* Bỏ bóng */
+    }
+    
+    /* Xóa bỏ focus mặc định của Firefox */
+    .select-minimal:-moz-focusring {
+      color: transparent;
+      text-shadow: 0 0 0 #000;
+    }
   </style>
 </head>
 <body class="bg-gray-50 text-slate-800 dark:bg-dark-950 dark:text-slate-200">
@@ -91,26 +142,26 @@
   <div class="mx-auto max-w-lg min-h-screen flex flex-col relative pb-32">
     
     <!-- Header (Sticky & Glass) -->
-    <header class="sticky top-0 z-30 glass px-4 py-3 flex items-center justify-between shadow-sm shadow-slate-200/50 dark:shadow-none" style="padding-top: calc(var(--safe-top) + 12px)">
+    <header class="sticky top-0 z-30 glass px-4 py-4 flex items-center justify-between shadow-sm shadow-slate-200/50 dark:shadow-none transition-all" style="padding-top: calc(var(--safe-top) + 12px)">
       <div class="flex items-center gap-3">
-        <div class="relative group cursor-pointer">
-          <div class="absolute -inset-1.5 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-200"></div>
-          <div class="relative h-10 w-10 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center shadow-sm border border-slate-100 dark:border-slate-700">
-            <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-          </div>
+        <div class="flex items-center justify-center">
+            <svg class="h-7 w-7 text-blue-600 dark:text-blue-400 drop-shadow-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
         </div>
-        <div>
-          <h1 class="text-lg font-bold tracking-tight text-slate-900 dark:text-white">Điểm danh</h1>
-          <p class="text-xs font-medium text-slate-500 dark:text-slate-400" id="currentDateDisplay">Bin Bin Hotel</p>
+        
+        <div class="flex flex-col">
+          <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">Điểm danh</h1>
+          <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wide opacity-80" id="currentDateDisplay">Bin Bin Hotel</p>
         </div>
       </div>
       
-      <!-- Theme Toggle -->
-      <button id="themeToggle" class="p-2.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all focus:outline-none active:scale-95">
-        <!-- Sun Icon -->
-        <svg id="sunIcon" class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-        <!-- Moon Icon -->
-        <svg id="moonIcon" class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+      <button id="themeToggle" class="group p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-all focus:outline-none active:rotate-12">
+        <svg id="sunIcon" class="w-6 h-6 hidden dark:block transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+        <svg id="moonIcon" class="w-6 h-6 block dark:hidden transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
       </button>
     </header>
 
@@ -191,32 +242,34 @@
 
           <!-- CENTER: Save Attendance (Floating Primary FAB) -->
           <button id="saveBtn" class="group relative -top-8 flex flex-col items-center justify-center focus:outline-none z-10">
-            <!-- Glow Effect Layer -->
-            <div class="absolute top-2 w-14 h-14 rounded-full bg-blue-500 blur-xl opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
             
-            <!-- Button Circle -->
-            <div class="relative h-[72px] w-[72px] rounded-full bg-gradient-to-b from-blue-500 to-blue-700 shadow-2xl shadow-blue-600/40 text-white flex items-center justify-center transform transition-all duration-300 group-active:scale-95 group-hover:-translate-y-1 border-4 border-white dark:border-slate-900">
+            <div class="absolute top-1 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full bg-cyan-500 blur-2xl opacity-40 group-hover:opacity-70 animate-pulse transition-opacity duration-500"></div>
+            
+            <div class="relative h-[72px] w-[72px] rounded-full 
+                        bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 
+                        shadow-[0_0_20px_rgba(6,182,212,0.5)] 
+                        text-white flex items-center justify-center 
+                        transform transition-all duration-300 
+                        group-active:scale-95 group-hover:-translate-y-1 group-hover:shadow-[0_10px_30px_rgba(6,182,212,0.6)]
+                        border-[4px] border-white dark:border-slate-900 bg-size-200 bg-pos-0 hover:bg-pos-100">
               
-              <!-- Icon -->
-              <svg id="saveIcon" class="h-8 w-8 drop-shadow-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                <polyline points="7 3 7 8 15 8"></polyline>
+              <svg id="saveIcon" class="h-9 w-9 drop-shadow-md transition-transform duration-300 group-hover:rotate-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
               
-              <!-- Spinner -->
-              <svg id="saveSpinner" class="hidden h-8 w-8 animate-spin text-white/90" fill="none" viewBox="0 0 24 24">
+              <svg id="saveSpinner" class="hidden h-8 w-8 animate-spin text-white" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
               
-              <!-- Smart Badge (NUMBER instead of !) -->
-              <div id="saveBadge" class="hidden absolute -top-1 -right-1 flex h-6 min-w-[24px] px-1.5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white border-[3px] border-white dark:border-slate-900 shadow-sm transition-transform duration-200">
+              <div id="saveBadge" class="hidden absolute top-0 -right-1 flex h-6 min-w-[24px] px-1.5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white border-[3px] border-white dark:border-slate-900 shadow-sm transition-transform duration-200">
                 0
               </div>
             </div>
             
-            <span class="mt-2 text-[11px] font-bold text-blue-600 dark:text-blue-400 tracking-wide uppercase opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-5">Lưu</span>
+            <span class="mt-2 text-[10px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-600 tracking-wider uppercase opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6">
+                Hoàn tất
+            </span>
           </button>
 
           <!-- RIGHT: Add Employee -->
@@ -394,6 +447,31 @@
 
     let employees = [];
 
+    // [THÊM MỚI] Hàm chuyển đổi Mã chi nhánh -> Tên hiển thị đầy đủ
+    function getBranchFullName(code) {
+        if (!code) return "Chưa xác định";
+        
+        // 1. Các chi nhánh đặc biệt
+        const specialMap = {
+            "QL": "Văn phòng Quản Lý",
+            "KTV": "Bộ phận Kỹ Thuật",
+            "ADMIN": "Quản Trị Hệ Thống",
+            "BOSS": "Ban Giám Đốc",
+            "DI DONG": "Nhân viên chạy ca (Mobile)"
+        };
+        
+        if (specialMap[code]) return specialMap[code];
+        
+        // 2. Các chi nhánh Khách sạn (B1, B2, B10...)
+        // Logic: Nếu bắt đầu bằng chữ "B" và theo sau là số -> Bin Bin Hotel + số
+        if (/^B\d+$/.test(code)) {
+            return `Bin Bin Hotel ${code.substring(1)}`;
+        }
+        
+        // 3. Fallback: Nếu không khớp cái nào thì trả về mã gốc
+        return code;
+    }
+
     function escapeHtml(s){ return String(s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
 
     function formatDepartment(department) {
@@ -516,112 +594,149 @@
       wrap.innerHTML = html;
     }
 
+    // [UX 2025] Hàm Render: Color Coding (Vàng cho Tăng ca) - Bỏ Badge chữ
     function renderAttendanceList(){
       const wrap = document.getElementById("attendanceList");
       wrap.innerHTML = "";
-      document.getElementById("emptyHint").classList.toggle('hidden', employees.length > 0);
       
-      // === BADGE LOGIC UPDATE (NUMBER COUNT) ===
-      const badge = document.getElementById('saveBadge');
-      if (employees.length > 0) {
-          badge.textContent = employees.length; // Show number
-          badge.classList.remove('hidden');
-          // Scale Effect on update
-          badge.classList.remove('scale-100');
-          badge.classList.add('scale-125');
-          setTimeout(() => {
-             badge.classList.remove('scale-125');
-             badge.classList.add('scale-100');
-          }, 200);
-      } else {
-          badge.classList.add('hidden');
-      }
-      // =========================================
+      document.getElementById("emptyHint").classList.toggle('hidden', employees.length > 0);
+      updateBadgeUI(); 
 
       employees.forEach((emp, idx) => {
         const row = document.createElement("div");
-        row.className = "animate-slide-up relative overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm transition-all hover:shadow-md";
-        row.style.animationDelay = `${idx * 50}ms`;
+        
+        // === [LOGIC MÀU SẮC ĐỘNG] ===
+        // Nếu tăng ca: Nền Vàng (Amber) + Viền Vàng
+        // Nếu thường: Nền Trắng (White/Slate) + Viền Xám
+        const bgClass = emp.la_tang_ca 
+            ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50" 
+            : "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700/50";
 
+        row.className = `employee-card animate-slide-up relative overflow-hidden rounded-2xl border shadow-sm transition-all h-auto ${bgClass}`;
+        row.style.animationDelay = `${idx * 40}ms`; 
+        row.dataset.code = emp.code; 
+
+        // Generate Options
         let optionsHtml = "";
         const values = emp.department?.toLowerCase() === "letan" ? [0.5, 1] : [0.5, 1, 1.5, 2, 2.5];
         values.forEach(v => {
             optionsHtml += `<option value="${v}" ${emp.so_cong_nv === v ? "selected" : ""}>${v}</option>`;
         });
 
-        // Generate Avatar Initials
-        const names = emp.name.split(' ');
-        const initials = names.length > 1 ? names[names.length-1][0] : names[0][0];
-        const avatarColor = ['bg-blue-100 text-blue-600', 'bg-purple-100 text-purple-600', 'bg-emerald-100 text-emerald-600', 'bg-amber-100 text-amber-600'][emp.code.charCodeAt(emp.code.length-1) % 4];
-
+        // HTML Content
         row.innerHTML = `
-          <div class="flex items-start justify-between gap-3">
-            <div class="flex items-center gap-3">
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl ${avatarColor} dark:bg-opacity-20 font-bold text-lg">
-                    ${initials}
-                </div>
-                <div>
-                    <h3 class="font-bold text-slate-800 dark:text-slate-100">${escapeHtml(emp.name)}</h3>
-                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">
-                        ${escapeHtml(emp.code)} <span class="mx-1 text-slate-300">|</span> ${escapeHtml(formatDepartment(emp.department))}
-                    </p>
-                    <div class="badge-container mt-1">
-                        ${emp.la_tang_ca ? '<span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-700/10">Tăng ca</span>' : ''}
-                    </div>
-                </div>
-            </div>
-            <button data-code="${escapeAttr(emp.code)}" class="btn-delete -mr-2 -mt-2 p-2 text-slate-300 hover:text-red-500 transition-colors">
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-          </div>
+          <div class="p-4">
+            <div class="flex items-start justify-between gap-3">
+                
+                <div class="flex-1 min-w-0 flex flex-col gap-1">
+                    <h3 class="font-bold text-[15px] text-slate-800 dark:text-slate-100 leading-snug break-words text-pretty">
+                        ${escapeHtml(emp.name)}
+                    </h3>
 
-          <div class="mt-4 grid grid-cols-10 gap-3">
-            <div class="col-span-3">
-                <div class="relative">
-                    <select data-code="${escapeAttr(emp.code)}" data-field="so_cong_nv" class="w-full appearance-none rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 py-2.5 pl-3 pr-8 text-sm font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                        ${optionsHtml}
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
+                    <p class="text-xs font-medium text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                        <span class="uppercase tracking-wider font-semibold opacity-80">${escapeHtml(emp.code)}</span>
+                        <span class="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-600 shrink-0"></span>
+                        <span class="truncate">${escapeHtml(formatDepartment(emp.department))}</span>
+                    </p>
+                </div>
+
+                <div class="shrink-0 flex items-center gap-1 rounded-xl p-1 border self-start mt-0.5 ${emp.la_tang_ca ? 'bg-white/60 dark:bg-black/20 border-amber-200/50 dark:border-amber-700/30' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-700'}">
+                     
+                     <div class="relative group h-8 flex items-center justify-center">
+                        <select data-code="${escapeAttr(emp.code)}" class="select-minimal w-14 appearance-none bg-transparent text-sm font-bold text-blue-600 dark:text-blue-400 cursor-pointer">
+                            ${optionsHtml}
+                        </select>
+                     </div>
+
+                     <div class="w-px h-4 bg-slate-200 dark:bg-slate-600 opacity-50"></div>
+
+                     <button type="button" class="btn-delete p-2 text-slate-400 hover:text-red-500 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-all active:scale-90" data-code="${escapeAttr(emp.code)}" data-name="${escapeAttr(emp.name)}">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                     </button>
                 </div>
             </div>
-            <div class="col-span-7">
-                <input data-code="${escapeAttr(emp.code)}" data-field="ghi_chu" value="${escapeAttr(emp.ghi_chu || '')}" 
-                    placeholder="Ghi chú..." 
-                    class="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 py-2.5 px-3 text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition" />
+
+            <div class="mt-3">
+                <div class="relative group">
+                    <input data-code="${escapeAttr(emp.code)}" data-field="ghi_chu" value="${escapeAttr(emp.ghi_chu || '')}" 
+                        placeholder="Thêm ghi chú..." 
+                        class="w-full rounded-xl border-none py-2.5 px-3 text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 transition-all ${emp.la_tang_ca ? 'bg-white/80 dark:bg-black/20 focus:bg-white dark:focus:bg-black/40' : 'bg-slate-50 dark:bg-slate-900/50 focus:bg-white dark:focus:bg-slate-800'}" />
+                </div>
             </div>
           </div>
         `;
 
-        // Event Handlers
-        row.querySelector('.btn-delete').onclick = (e) => {
+        // === LOGIC XÓA (Giữ nguyên) ===
+        const delBtn = row.querySelector('.btn-delete');
+        delBtn.onclick = (e) => {
+            e.stopPropagation();
+            const btn = e.currentTarget;
+            const empName = btn.dataset.name;
+            const codeToDelete = btn.dataset.code;
+
+            if (!confirm(`Bạn có chắc chắn muốn xóa nhân viên "${empName}" khỏi danh sách chấm công không?`)) {
+                return;
+            }
+
             vibrate(10);
             playSound('delete');
-            employees = employees.filter(x => x.code !== e.currentTarget.dataset.code);
-            // Animate out
-            const parent = e.currentTarget.closest('div.animate-slide-up');
-            parent.style.transform = 'translateX(100%)';
-            parent.style.opacity = '0';
-            setTimeout(renderAttendanceList, 200);
+
+            const card = btn.closest('.employee-card');
+            card.style.pointerEvents = 'none';
+            card.style.maxHeight = card.scrollHeight + "px";
+
+            requestAnimationFrame(() => {
+                card.classList.add('slide-out-right');
+                setTimeout(() => {
+                    card.classList.add('collapse-height');
+                    setTimeout(() => {
+                        card.remove();
+                        employees = employees.filter(x => x.code !== codeToDelete);
+                        updateBadgeUI();
+                        if(employees.length === 0) document.getElementById("emptyHint").classList.remove('hidden');
+                    }, 300);
+                }, 350);
+            });
         };
         
-        row.querySelector('select').onchange = (e) => {
+        // Event Change Select
+        const selectEl = row.querySelector('select');
+        selectEl.onchange = (e) => {
             const t = employees.find(x => x.code === e.currentTarget.dataset.code);
             if(t) {
                 t.so_cong_nv = parseFloat(e.target.value);
-                updateEmployeeOvertime(t);
-                renderAttendanceList(); // Re-render to update badges
+                updateEmployeeOvertime(t); 
+                renderAttendanceList(); 
             }
         };
 
-        row.querySelector('input').oninput = (e) => {
+        // Event Input Note
+        const inputEl = row.querySelector('input');
+        inputEl.oninput = (e) => {
             const t = employees.find(x => x.code === e.currentTarget.dataset.code);
             if(t) t.ghi_chu = e.target.value;
         }
 
         wrap.appendChild(row);
       });
+    }
+
+    // Helper: Update Badge số lượng nhân viên
+    function updateBadgeUI() {
+        const badge = document.getElementById('saveBadge');
+        if (employees.length > 0) {
+            badge.textContent = employees.length;
+            badge.classList.remove('hidden');
+            // Hiệu ứng "pop" nhẹ
+            badge.classList.remove('scale-100');
+            badge.classList.add('scale-125');
+            setTimeout(() => {
+                badge.classList.remove('scale-125');
+                badge.classList.add('scale-100');
+            }, 200);
+        } else {
+            badge.classList.add('hidden');
+        }
     }
 
     async function safeFetchJson(url, options){
@@ -793,14 +908,15 @@
           try {
              const data = await safeFetchJson(detectBranchUrl(), { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ lat:pos.coords.latitude, lng:pos.coords.longitude }) });
              if(data.branch) {
-                 currentBranch = data.branch;
-                 document.getElementById("branchName").textContent = currentBranch || "(Chưa rõ)";
-                 loadEmployeesForBranch();
-             } else if(data.choices) {
+                currentBranch = data.branch;
+                // [CẬP NHẬT] Hiển thị tên đầy đủ
+                document.getElementById("branchName").textContent = getBranchFullName(currentBranch); 
+                loadEmployeesForBranch();
+              } else if(data.choices) {
                  // Populate branch popup
                  const html = data.choices.map(c => `
                     <button onclick="selectBranch('${c.branch}')" class="w-full flex items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 mb-2 transition">
-                        <span class="font-bold text-slate-800 dark:text-slate-200">${c.branch}</span>
+                        <span class="font-bold text-slate-800 dark:text-slate-200">${getBranchFullName(c.branch)}</span>
                         <span class="text-xs text-slate-500">${Math.round(c.distance_km*1000)}m</span>
                     </button>
                  `).join('');
@@ -812,8 +928,8 @@
     }
 
     window.selectBranch = async (b) => {
-        currentBranch = b;
-        document.getElementById("branchName").textContent = b;
+      currentBranch = b;
+      document.getElementById("branchName").textContent = getBranchFullName(b);
         await safeFetchJson(selectBranchUrl(), { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ branch: b }) });
         closeModal('branchPopup');
         loadEmployeesForBranch();
@@ -833,7 +949,12 @@
         if(["quanly","ktv","boss","admin"].includes(role)) {
             try {
                 const d = await safeFetchJson("/attendance/api/detect-branch", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({}) });
-                if(d.branch) { currentBranch=d.branch; document.getElementById("branchName").textContent=currentBranch; loadEmployeesForBranch(); }
+                if(d.branch) { 
+                  currentBranch=d.branch; 
+                  // [CẬP NHẬT]
+                  document.getElementById("branchName").textContent = getBranchFullName(currentBranch); 
+                  loadEmployeesForBranch(); 
+              }
             } catch(e){}
         } else {
             detectBranchByGPS();
