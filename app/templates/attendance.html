@@ -142,37 +142,51 @@
   <div class="mx-auto max-w-lg min-h-screen flex flex-col relative pb-32">
     
     <!-- Header (Sticky & Glass) -->
-    <header class="sticky top-0 z-30 glass px-4 py-4 flex items-center justify-between shadow-sm shadow-slate-200/50 dark:shadow-none transition-all" style="padding-top: calc(var(--safe-top) + 12px)">
-      <div class="flex items-center gap-3">
-        <div class="flex items-center justify-center">
-            <svg class="h-7 w-7 text-blue-600 dark:text-blue-400 drop-shadow-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
+    <!-- Header (Sticky & Glass) - DESIGN 2025: SQUIRCLE ICON & CLEAN TYPO -->
+    <header class="sticky top-0 z-30 glass px-6 py-4 flex items-center justify-between transition-all duration-300" style="padding-top: calc(var(--safe-top) + 16px)">
+      
+      <!-- Left: Brand Identity -->
+      <div class="flex items-center gap-4">
+        
+        <!-- Logo Container: Hình khối bo tròn mềm mại (Squircle) + Hiệu ứng chiều sâu -->
+        <div class="relative group cursor-pointer">
+            <!-- Glow Effect phía sau -->
+            <div class="absolute inset-0 bg-blue-500/20 dark:bg-blue-400/10 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            
+            <!-- Icon Box chính -->
+            <div class="relative h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900 border border-slate-100 dark:border-slate-700 shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none group-hover:scale-105 transition-transform duration-300">
+                <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            </div>
         </div>
         
-        <div class="flex flex-col">
-          <h1 class="text-2xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-cyan-500 dark:from-blue-400 dark:to-cyan-300">
+        <!-- Text Info -->
+        <div class="flex flex-col justify-center">
+          <h1 class="text-lg font-bold text-slate-900 dark:text-white leading-none tracking-tight">
             Điểm danh
           </h1>
           
-          <div class="flex items-center gap-1.5 mt-0.5">
+          <!-- Live Date Status -->
+          <div class="flex items-center gap-1.5 mt-1.5">
             <span class="relative flex h-2 w-2">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest" id="currentDateDisplay">
+            <p class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest" id="currentDateDisplay">
               Loading...
             </p>
           </div>
         </div>
       </div>
       
-      <button id="themeToggle" class="group p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-all focus:outline-none active:rotate-12">
-        <svg id="sunIcon" class="w-6 h-6 hidden dark:block transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-        <svg id="moonIcon" class="w-6 h-6 block dark:hidden transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+      <!-- Right: Theme Toggle (Minimalist) -->
+      <button id="themeToggle" class="group p-2.5 rounded-2xl bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 text-slate-500 dark:text-slate-400 transition-all focus:outline-none active:scale-95">
+        <svg id="sunIcon" class="w-5 h-5 hidden dark:block transition-transform duration-500 group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+        <svg id="moonIcon" class="w-5 h-5 block dark:hidden transition-transform duration-500 group-hover:-rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
       </button>
     </header>
 
