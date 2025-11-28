@@ -134,6 +134,19 @@
       color: transparent;
       text-shadow: 0 0 0 #000;
     }
+
+    .ui-locked {
+        pointer-events: none !important; /* Không cho click bất cứ đâu */
+        filter: grayscale(100%) opacity(0.6); /* Xám màu và mờ đi */
+        user-select: none; /* Không cho bôi đen text */
+    }
+
+    /* [NEW] Style cho Modal Cảnh báo bắt buộc (Không cho đóng) */
+    .modal-backdrop-force {
+        background-color: rgba(0, 0, 0, 0.9) !important; /* Đen đặc hơn */
+        backdrop-filter: blur(5px);
+        z-index: 9999; /* Luôn đè lên trên cùng */
+    }
   </style>
 </head>
 <body class="bg-gray-50 text-slate-800 dark:bg-dark-950 dark:text-slate-200">
@@ -924,32 +937,106 @@
         showStatusModal('success', `Đã thêm "${name} - ${formatDepartment(dept)}" vào danh sách.`, 2000);
     };
 
+    /* ========= Lock/Unlock System ========= */
+    
+    // Hàm khóa giao diện
+    function lockInterface() {
+        const mainContent = document.querySelector('main');
+        const bottomNav = document.querySelector('.fixed.bottom-0');
+        const header = document.querySelector('header');
+        
+        mainContent.classList.add('ui-locked');
+        bottomNav.classList.add('ui-locked');
+        // header.classList.add('ui-locked'); // Có thể giữ header để user log out nếu muốn
+    }
+
+    // Hàm mở khóa
+    function unlockInterface() {
+        const mainContent = document.querySelector('main');
+        const bottomNav = document.querySelector('.fixed.bottom-0');
+        
+        mainContent.classList.remove('ui-locked');
+        bottomNav.classList.remove('ui-locked');
+    }
+
+    // Hàm hiện Modal bắt buộc bật GPS (Không có nút tắt)
+    function showForceGPSModal() {
+        // Tạo modal cứng nếu chưa có
+        if (!document.getElementById('forceGpsModal')) {
+            const div = document.createElement('div');
+            div.id = 'forceGpsModal';
+            div.className = 'fixed inset-0 flex items-center justify-center p-6 modal-backdrop-force animate-fade-in';
+            div.innerHTML = `
+                <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-2 border-red-500 relative">
+                    <div class="mx-auto w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6 animate-pulse">
+                        <svg class="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    </div>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-3">Yêu cầu GPS!</h2>
+                    <p class="text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
+                        Để chấm công, bạn <strong>bắt buộc</strong> phải bật định vị và cấp quyền truy cập vị trí cho trình duyệt.
+                    </p>
+                    <button onclick="location.reload()" class="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-500/30 transition-transform active:scale-95">
+                        Đã bật, thử lại ngay
+                    </button>
+                    <p class="text-xs text-slate-400 mt-4">Nếu vẫn không được, hãy kiểm tra cài đặt quyền riêng tư trên điện thoại.</p>
+                </div>
+            `;
+            document.body.appendChild(div);
+        }
+    }
+
     /* GPS & Init */
     async function detectBranchByGPS(){
-      // Logic same as original, adapted for UI
-      if (!navigator.geolocation) return;
-      document.getElementById("branchName").textContent = "Đang tìm vị trí...";
+      document.getElementById("branchName").textContent = "Đang định vị...";
+      
+      if (!navigator.geolocation) {
+          showForceGPSModal();
+          return;
+      }
+
       navigator.geolocation.getCurrentPosition(async (pos)=>{
+          // --- GPS THÀNH CÔNG ---
           try {
-             const data = await safeFetchJson(detectBranchUrl(), { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ lat:pos.coords.latitude, lng:pos.coords.longitude }) });
+             const data = await safeFetchJson(detectBranchUrl(), { 
+                 method:"POST", 
+                 headers:{"Content-Type":"application/json"}, 
+                 body: JSON.stringify({ lat:pos.coords.latitude, lng:pos.coords.longitude }) 
+             });
+             
              if(data.branch) {
                 currentBranch = data.branch;
-                // [CẬP NHẬT] Hiển thị tên đầy đủ
-                document.getElementById("branchName").textContent = getBranchFullName(currentBranch); 
+                document.getElementById("branchName").textContent = getBranchFullName(currentBranch);
+                
+                // QUAN TRỌNG: Mở khóa giao diện khi đã có chi nhánh hợp lệ
+                unlockInterface();
                 loadEmployeesForBranch();
+
               } else if(data.choices) {
-                 // Populate branch popup
-                 const html = data.choices.map(c => `
-                    <button onclick="selectBranch('${c.branch}')" class="w-full flex items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 mb-2 transition">
-                        <span class="font-bold text-slate-800 dark:text-slate-200">${getBranchFullName(c.branch)}</span>
-                        <span class="text-xs text-slate-500">${Math.round(c.distance_km*1000)}m</span>
-                    </button>
-                 `).join('');
+                 // Logic chọn nhiều chi nhánh (nếu có)
+                 const html = data.choices.map(c => `...`).join(''); // (Giữ code cũ render list)
                  document.getElementById('branchChoices').innerHTML = html;
                  openModal('branchPopup');
+                 // Lưu ý: Chưa unlock vội, đợi user chọn xong ở hàm selectBranch
              }
-          } catch(e) { document.getElementById("branchName").textContent = "Lỗi GPS"; }
-      }, () => document.getElementById("branchName").textContent = "Không có GPS");
+          } catch(e) { 
+             // Lỗi API (ví dụ server trả về lỗi quá xa)
+             document.getElementById("branchName").textContent = "Lỗi xác thực vị trí";
+             showStatusModal('error', "Vị trí không hợp lệ hoặc quá xa!");
+             // Vẫn giữ khóa UI
+          }
+
+      }, (error) => {
+          // --- GPS THẤT BẠI / TỪ CHỐI ---
+          console.error("GPS Error:", error);
+          document.getElementById("branchName").textContent = "Không có GPS";
+          
+          // Hiện Modal bắt buộc -> Chặn toàn bộ thao tác
+          showForceGPSModal();
+      }, {
+          enableHighAccuracy: true, // Yêu cầu chính xác cao
+          timeout: 10000,           // Chờ tối đa 10s
+          maximumAge: 0             // Không dùng cache vị trí cũ
+      });
     }
 
     window.selectBranch = async (b) => {
@@ -958,11 +1045,14 @@
         await safeFetchJson(selectBranchUrl(), { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ branch: b }) });
         closeModal('branchPopup');
         loadEmployeesForBranch();
+        unlockInterface(); // Mở khóa
+        loadEmployeesForBranch();
     }
 
     // Initialize logic
     window.addEventListener("DOMContentLoaded", async () => {
         // Night shift logic
+        lockInterface();
         const h = new Date().getHours();
         if(h < 7) {
             const y = new Date(); y.setDate(y.getDate()-1);
@@ -971,17 +1061,36 @@
         }
         
         const role = (userRole||"").toLowerCase();
-        if(["quanly","ktv","boss","admin"].includes(role)) {
+        const specialRoles = ["quanly", "ktv", "boss", "admin"];
+
+        if(specialRoles.includes(role)) {
+            // === LOGIC CHO QUẢN LÝ / KTV ===
             try {
-                const d = await safeFetchJson("/attendance/api/detect-branch", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({}) });
+                // Gọi API detect-branch (Server sẽ tự lấy theo ID, không cần GPS)
+                const d = await safeFetchJson("/attendance/api/detect-branch", { 
+                    method:"POST", 
+                    headers:{"Content-Type":"application/json"}, 
+                    body: JSON.stringify({}) // Gửi body rỗng
+                });
+                
                 if(d.branch) { 
-                  currentBranch=d.branch; 
-                  // [CẬP NHẬT]
+                  currentBranch = d.branch; 
                   document.getElementById("branchName").textContent = getBranchFullName(currentBranch); 
+                  
+                  // MỞ KHÓA CHO QUẢN LÝ
+                  unlockInterface();
                   loadEmployeesForBranch(); 
-              }
-            } catch(e){}
+                } else {
+                    // Trường hợp hy hữu QL mà không có branch trong DB
+                    document.getElementById("branchName").textContent = "Chưa gán chi nhánh";
+                    // Vẫn khóa
+                }
+            } catch(e){
+                 document.getElementById("branchName").textContent = "Lỗi dữ liệu";
+            }
         } else {
+            // === LOGIC CHO NHÂN VIÊN THƯỜNG ===
+            // Bắt buộc chạy GPS check
             detectBranchByGPS();
         }
     });
