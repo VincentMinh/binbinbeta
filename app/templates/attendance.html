@@ -1006,6 +1006,8 @@
              if(data.branch) {
                 currentBranch = data.branch;
                 document.getElementById("branchName").textContent = getBranchFullName(currentBranch);
+
+                window.dispatchEvent(new CustomEvent('branch-changed', { detail: currentBranch }));
                 
                 // QUAN TRỌNG: Mở khóa giao diện khi đã có chi nhánh hợp lệ
                 unlockInterface();
@@ -1042,11 +1044,11 @@
     window.selectBranch = async (b) => {
       currentBranch = b;
       document.getElementById("branchName").textContent = getBranchFullName(b);
-        await safeFetchJson(selectBranchUrl(), { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ branch: b }) });
-        closeModal('branchPopup');
-        loadEmployeesForBranch();
-        unlockInterface(); // Mở khóa
-        loadEmployeesForBranch();
+      window.dispatchEvent(new CustomEvent('branch-changed', { detail: b }));
+      await safeFetchJson(selectBranchUrl(), { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ branch: b }) });
+      closeModal('branchPopup');
+      loadEmployeesForBranch();
+      unlockInterface(); // Mở khóa
     }
 
     // Initialize logic
@@ -1075,7 +1077,9 @@
                 
                 if(d.branch) { 
                   currentBranch = d.branch; 
-                  document.getElementById("branchName").textContent = getBranchFullName(currentBranch); 
+                  document.getElementById("branchName").textContent = getBranchFullName(currentBranch);
+
+                  window.dispatchEvent(new CustomEvent('branch-changed', { detail: currentBranch }));
                   
                   // MỞ KHÓA CHO QUẢN LÝ
                   unlockInterface();
