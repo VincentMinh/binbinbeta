@@ -85,7 +85,6 @@ def attendance_ui(request: Request, db: Session = Depends(get_db)):
         "login_code": user_data.get("code", ""),
         "role": user_data.get("role", ""),
         "token": request.query_params.get("token", ""),
-        "version": version_code # <--- 3. TRUYỀN BIẾN VERSION VÀO ĐÂY
     })
     
     # Các header chặn cache này vẫn giữ nguyên là rất tốt
